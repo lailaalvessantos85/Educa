@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gerador de Rubrica de Avaliação</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  .rg-root {
+    --paper: #eceef0;
+    --card: #fbfbfa;
+    --ink: #16264a;
+    --ink-soft: #5c6b85;
+    --stamp: #c1592c;
+    --gold: #c1592c;
+    --rule: #d3d7de;
+    font-family: 'Public Sans', sans-serif;
+    color: var(--ink);
+    background-color: var(--paper);
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent,
+      transparent 27px,
+      var(--rule) 28px
+    );
+    min-height: 100vh;
+    padding: 32px 20px 64px;
+    box-sizing: border-box;
+  }
+  .rg-root * { box-sizing: border-box; }
+  .rg-shell { max-width: 1100px; margin: 0 auto; }
+
+  .rg-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 18px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .rg-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 6px;
+  }
+  .rg-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: clamp(24px, 3.4vw, 36px);
+    line-height: 1.1;
+    margin: 0;
+    background: transparent;
+    border: none;
+    width: 100%;
+    color: var(--ink);
+    padding: 2px 0;
+  }
+  .rg-title:focus-visible { outline: 2px solid var(--stamp); outline-offset: 4px; }
+
+  .rg-seal {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border: 1.5px dashed var(--gold);
+    color: var(--gold);
+    border-radius: 999px;
+    padding: 8px 16px;
+    white-space: nowrap;
+    transform: rotate(-3deg);
+  }
+
+  .rg-ruler-wrap { margin-bottom: 28px; }
+  .rg-ruler-label {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+  }
+  .rg-ruler-label strong { color: var(--ink); }
+  .rg-ruler {
+    position: relative;
+    height: 22px;
+    background: var(--card);
+    border: 1.5px solid var(--ink);
+    overflow: hidden;
+  }
+  .rg-ruler-fill {
+    height: 100%;
+    background: var(--ink);
+    transition: width 0.3s ease, background-color 0.3s ease;
+  }
+  .rg-ruler-fill.over { background: var(--stamp); }
+  .rg-ruler-fill.exact { background: var(--gold); }
+  .rg-ruler-ticks { position: absolute; inset: 0; display: flex; }
+  .rg-ruler-ticks span { flex: 1; border-right: 1px solid rgba(30,42,68,0.15); }
+  .rg-ruler-ticks span:last-child { border-right: none; }
+
+  .rg-panel {
+    background: var(--card);
+    border: 1.5px solid var(--ink);
+    padding: 18px;
+  }
+
+  .rg-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border: 1.5px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+    padding: 9px 14px;
+    cursor: pointer;
+    transition: transform 0.12s ease;
+  }
+  .rg-btn:hover { transform: translateY(-1px); }
+  .rg-btn:focus-visible { outline: 2px solid var(--stamp); outline-offset: 2px; }
+  .rg-btn.ghost { background: transparent; color: var(--ink); }
+  .rg-btn.stamp-red { background: var(--stamp); border-color: var(--stamp); color: #fff; }
+
+  .rg-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+
+  .rg-table-scroll { overflow-x: auto; border: 1.5px solid var(--ink); }
+  table.rg-table { border-collapse: collapse; width: 100%; min-width: 760px; background: var(--card); }
+  .rg-table th, .rg-table td { border: 1px solid var(--rule); padding: 10px; vertical-align: top; text-align: left; }
+  .rg-table thead th {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
+    background: rgba(30,42,68,0.04);
+  }
+  .rg-crit-cell { min-width: 190px; }
+  .rg-crit-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid var(--gold);
+    color: var(--gold);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+  .rg-crit-name-row { display: flex; align-items: center; margin-bottom: 8px; }
+  .rg-crit-name {
+    font-weight: 600;
+    border: none;
+    background: transparent;
+    font-family: 'Public Sans', sans-serif;
+    font-size: 14px;
+    width: 100%;
+    padding: 2px 0;
+  }
+  .rg-crit-weight {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .rg-crit-weight input {
+    width: 56px;
+    border: 1px solid var(--rule);
+    padding: 3px 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+  }
+  .rg-remove-btn {
+    background: none;
+    border: none;
+    color: var(--stamp);
+    cursor: pointer;
+    padding: 4px;
+    margin-left: 6px;
+    font-size: 15px;
+  }
+  .rg-remove-btn:focus-visible { outline: 2px solid var(--stamp); }
+
+  .rg-descriptor {
+    min-height: 76px;
+    font-size: 12.5px;
+    border: none;
+    background: transparent;
+    width: 100%;
+    padding: 4px;
+    font-family: 'Public Sans', sans-serif;
+  }
+  .rg-descriptor:focus-visible { outline: 1.5px solid var(--stamp); background: #fff; }
+
+  .rg-level-cell { cursor: pointer; transition: background-color 0.15s ease; min-width: 150px; }
+  .rg-level-cell.selected { background: rgba(193,89,44,0.1); box-shadow: inset 0 0 0 2px var(--stamp); }
+  .rg-level-pick {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    color: var(--ink-soft);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .rg-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--ink-soft);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+  }
+
+  .rg-footer {
+    margin-top: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .rg-score-stamp {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 22px;
+    color: var(--stamp);
+    border: 3px double var(--stamp);
+    padding: 10px 22px;
+    transform: rotate(-4deg);
+    animation: rg-stamp-in 0.35s ease-out;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rg-score-stamp { animation: none; }
+    .rg-btn:hover { transform: none; }
+  }
+  @keyframes rg-stamp-in {
+    from { opacity: 0; transform: rotate(-4deg) scale(1.4); }
+    to { opacity: 1; transform: rotate(-4deg) scale(1); }
+  }
+
+  .rg-hint { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--ink-soft); }
+  body { margin: 0; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState } = React;
+
+const LEVEL_PRESET = [
+  { id: "l1", label: "Insuficiente", percent: 0 },
+  { id: "l2", label: "Regular", percent: 50 },
+  { id: "l3", label: "Bom", percent: 75 },
+  { id: "l4", label: "Excelente", percent: 100 },
+];
+
+const DEFAULT_CRITERIA = [
+  { id: "c1", name: "Coesão e coerência textual", weight: 3, descriptors: {
+      l1: "Ideias desconectadas; falta de progressão lógica entre parágrafos.",
+      l2: "Conectivos básicos presentes, mas com rupturas ocasionais no fio argumentativo.",
+      l3: "Progressão textual clara, com uso adequado de conectores.",
+      l4: "Encadeamento fluido e sofisticado; cada parágrafo sustenta o seguinte." } },
+  { id: "c2", name: "Argumentação e uso de evidências", weight: 3, descriptors: {
+      l1: "Afirmações sem sustentação ou evidência.",
+      l2: "Argumentos presentes, mas pouco desenvolvidos ou com evidência frágil.",
+      l3: "Argumentos consistentes, apoiados em evidências relevantes.",
+      l4: "Argumentação robusta, com evidências bem escolhidas e contra-argumentos considerados." } },
+  { id: "c3", name: "Normas ABNT e formatação", weight: 2, descriptors: {
+      l1: "Não segue as normas; citações e referências ausentes ou incorretas.",
+      l2: "Aplicação parcial das normas, com erros recorrentes.",
+      l3: "Normas aplicadas corretamente na maior parte do texto.",
+      l4: "Conformidade integral às normas ABNT em todo o documento." } },
+  { id: "c4", name: "Originalidade e contribuição", weight: 2, descriptors: {
+      l1: "Reproduz ideias de terceiros sem elaboração própria.",
+      l2: "Alguma reflexão própria, ainda pouco desenvolvida.",
+      l3: "Contribuição própria clara sobre o tema.",
+      l4: "Perspectiva original e bem fundamentada, com potencial de aprofundamento." } },
+];
+
+function uid() { return Math.random().toString(36).slice(2, 9); }
+
+function RubricGenerator() {
+  const [levels] = useState(LEVEL_PRESET);
+  const [criteria, setCriteria] = useState(DEFAULT_CRITERIA);
+  const [gradingMode, setGradingMode] = useState(false);
+  const [selections, setSelections] = useState({});
+  const [title, setTitle] = useState("Rubrica de Avaliação — Produção Textual");
+
+  const totalWeight = criteria.reduce((s, c) => s + Number(c.weight || 0), 0);
+  const weightOk = Math.abs(totalWeight - 10) < 0.05;
+
+  const allSelected = criteria.length > 0 && criteria.every((c) => selections[c.id]);
+  const finalScore = allSelected
+    ? criteria.reduce((sum, c) => {
+        const levelId = selections[c.id];
+        const level = levels.find((l) => l.id === levelId);
+        return sum + Number(c.weight) * (level.percent / 100);
+      }, 0)
+    : null;
+
+  function addCriterion() {
+    setCriteria((prev) => [...prev, { id: uid(), name: "", weight: 0, descriptors: { l1: "", l2: "", l3: "", l4: "" } }]);
+  }
+  function removeCriterion(id) {
+    setCriteria((prev) => prev.filter((c) => c.id !== id));
+    setSelections((prev) => { const next = { ...prev }; delete next[id]; return next; });
+  }
+  function updateCriterion(id, field, value) {
+    setCriteria((prev) => prev.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
+  }
+  function updateDescriptor(id, levelId, value) {
+    setCriteria((prev) => prev.map((c) => (c.id === id ? { ...c, descriptors: { ...c.descriptors, [levelId]: value } } : c)));
+  }
+  function selectLevel(criterionId, levelId) {
+    setSelections((prev) => ({ ...prev, [criterionId]: levelId }));
+  }
+  function resetGrading() { setSelections({}); }
+
+  function exportCSV() {
+    const header = ["Critério", "Peso", ...levels.map((l) => l.label)];
+    const rows = criteria.map((c) => [c.name, c.weight, ...levels.map((l) => c.descriptors[l.id] || "")]);
+    const escape = (v) => `"${String(v).replace(/"/g, '""')}"`;
+    const csv = [header, ...rows].map((r) => r.map(escape).join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "rubrica-avaliacao.csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function exportDOCX() {
+    const esc = (v) => String(v || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const rows = criteria.map((c, idx) => `
+        <tr>
+          <td style="border:1px solid #999;padding:8px;vertical-align:top;width:16%;">
+            <strong>${idx + 1}. ${esc(c.name) || "(sem nome)"}</strong><br/>
+            <span style="font-size:11px;color:#555;">Peso: ${esc(c.weight)} pts</span>
+          </td>
+          ${levels.map((l) => `
+            <td style="border:1px solid #999;padding:8px;vertical-align:top;">
+              <span style="font-size:11px;color:#555;">${esc(l.label)} (${l.percent}%)</span><br/>
+              ${esc(c.descriptors[l.id])}
+            </td>`).join("")}
+        </tr>`).join("");
+    const html = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="utf-8"><title>${esc(title)}</title></head>
+      <body style="font-family:Calibri,Arial,sans-serif;color:#16264a;">
+        <h1 style="font-size:20px;border-bottom:2px solid #16264a;padding-bottom:8px;">${esc(title)}</h1>
+        <p style="font-size:11px;color:#555;">Escala: 0 a 10 pontos &mdash; soma dos pesos: ${totalWeight.toFixed(1)} pts</p>
+        <table style="border-collapse:collapse;width:100%;font-size:12px;margin-top:12px;">
+          <thead><tr>
+            <th style="border:1px solid #999;padding:8px;background:#eceef0;text-align:left;">Critério</th>
+            ${levels.map((l) => `<th style="border:1px solid #999;padding:8px;background:#eceef0;text-align:left;">${esc(l.label)}</th>`).join("")}
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </body></html>`;
+    const blob = new Blob(["\ufeff", html], { type: "application/msword" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "rubrica-avaliacao.doc";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="rg-root">
+      <div className="rg-shell">
+        <header className="rg-header">
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <p className="rg-eyebrow">Gerador de rubrica de avaliação</p>
+            <input className="rg-title" value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Título da rubrica" />
+          </div>
+          <span className="rg-seal">Escala 0–10</span>
+        </header>
+
+        <div className="rg-ruler-wrap">
+          <div className="rg-ruler-label">
+            <span>Distribuição de pesos</span>
+            <span><strong>{totalWeight.toFixed(1)}</strong> / 10,0 pts</span>
+          </div>
+          <div className="rg-ruler">
+            <div className={`rg-ruler-fill ${totalWeight > 10 ? "over" : weightOk ? "exact" : ""}`}
+                 style={{ width: `${Math.min((totalWeight / 10) * 100, 100)}%` }} />
+            <div className="rg-ruler-ticks" aria-hidden="true">
+              {Array.from({ length: 10 }).map((_, i) => <span key={i} />)}
+            </div>
+          </div>
+        </div>
+
+        <div className="rg-actions">
+          <button className="rg-btn" onClick={addCriterion}>+ Adicionar critério</button>
+          <button className={`rg-btn ${gradingMode ? "stamp-red" : "ghost"}`} onClick={() => setGradingMode((v) => !v)}>
+            {gradingMode ? "Voltar a editar" : "Modo correção"}
+          </button>
+          {gradingMode && <button className="rg-btn ghost" onClick={resetGrading}>↺ Limpar seleção</button>}
+          <button className="rg-btn ghost" onClick={exportCSV}>⬇ Exportar CSV</button>
+          <button className="rg-btn ghost" onClick={exportDOCX}>📄 Baixar Word (.doc)</button>
+        </div>
+
+        {criteria.length === 0 ? (
+          <div className="rg-panel rg-empty">Nenhum critério ainda. Clique em "Adicionar critério" para começar sua rubrica.</div>
+        ) : (
+          <div className="rg-table-scroll">
+            <table className="rg-table">
+              <thead>
+                <tr>
+                  <th className="rg-crit-cell">Critério</th>
+                  {levels.map((l) => (
+                    <th key={l.id}>{l.label}<div style={{ fontWeight: 400, opacity: 0.7 }}>{l.percent}% do peso</div></th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {criteria.map((c, idx) => (
+                  <tr key={c.id}>
+                    <td className="rg-crit-cell">
+                      <div className="rg-crit-name-row">
+                        <span className="rg-crit-num">{idx + 1}</span>
+                        <input className="rg-crit-name" value={c.name} placeholder="Nome do critério"
+                               onChange={(e) => updateCriterion(c.id, "name", e.target.value)} disabled={gradingMode} />
+                        {!gradingMode && (
+                          <button className="rg-remove-btn" onClick={() => removeCriterion(c.id)}
+                                  aria-label={`Remover critério ${c.name || idx + 1}`}>✕</button>
+                        )}
+                      </div>
+                      <div className="rg-crit-weight">
+                        Peso:
+                        <input type="number" min="0" step="0.5" value={c.weight}
+                               onChange={(e) => updateCriterion(c.id, "weight", e.target.value)} disabled={gradingMode} />
+                        pts
+                      </div>
+                    </td>
+                    {levels.map((l) => {
+                      const selected = selections[c.id] === l.id;
+                      return (
+                        <td key={l.id} className={`rg-level-cell ${selected ? "selected" : ""}`}
+                            onClick={() => gradingMode && selectLevel(c.id, l.id)}>
+                          {gradingMode && (
+                            <div className="rg-level-pick">
+                              <input type="radio" name={`sel-${c.id}`} checked={selected}
+                                     onChange={() => selectLevel(c.id, l.id)}
+                                     aria-label={`${l.label} para ${c.name || "critério"}`} />
+                              {(Number(c.weight) * (l.percent / 100)).toFixed(1)} pts
+                            </div>
+                          )}
+                          <textarea className="rg-descriptor" value={c.descriptors[l.id]}
+                                    placeholder="Descreva este nível de desempenho…"
+                                    onChange={(e) => updateDescriptor(c.id, l.id, e.target.value)} disabled={gradingMode} />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="rg-footer">
+          <span className="rg-hint">
+            {weightOk ? "Pesos somam 10,0 — rubrica pronta para uso."
+              : totalWeight > 10 ? "Os pesos ultrapassam 10,0 pontos. Ajuste antes de usar."
+              : "Os pesos ainda não somam 10,0 pontos."}
+          </span>
+          {gradingMode && (allSelected
+            ? <div className="rg-score-stamp">Nota: {finalScore.toFixed(1)}</div>
+            : <span className="rg-hint">Selecione um nível em cada critério para calcular a nota.</span>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<RubricGenerator />);
+</script>
+</body>
+</html>
