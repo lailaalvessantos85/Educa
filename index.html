@@ -246,6 +246,23 @@
     padding: 10px 22px;
     transform: rotate(-4deg);
     animation: rg-stamp-in 0.35s ease-out;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.3;
+  }
+  .rg-score-stamp.partial {
+    font-size: 17px;
+    border-style: dashed;
+    opacity: 0.85;
+  }
+  .rg-score-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
   }
   @media (prefers-reduced-motion: reduce) {
     .rg-score-stamp { animation: none; }
@@ -309,13 +326,14 @@ function RubricGenerator() {
   const weightOk = Math.abs(totalWeight - 10) < 0.05;
 
   const allSelected = criteria.length > 0 && criteria.every((c) => selections[c.id]);
-  const finalScore = allSelected
-    ? criteria.reduce((sum, c) => {
-        const levelId = selections[c.id];
-        const level = levels.find((l) => l.id === levelId);
-        return sum + Number(c.weight) * (level.percent / 100);
-      }, 0)
-    : null;
+  const scoredCount = criteria.filter((c) => selections[c.id]).length;
+  const partialScore = criteria.reduce((sum, c) => {
+    const levelId = selections[c.id];
+    if (!levelId) return sum;
+    const level = levels.find((l) => l.id === levelId);
+    return sum + Number(c.weight) * (level.percent / 100);
+  }, 0);
+  const finalScore = allSelected ? partialScore : null;
 
   function addCriterion() {
     setCriteria((prev) => [...prev, { id: uid(), name: "", weight: 0, descriptors: { l1: "", l2: "", l3: "", l4: "" } }]);
@@ -485,8 +503,11 @@ function RubricGenerator() {
               : "Os pesos ainda não somam 10,0 pontos."}
           </span>
           {gradingMode && (allSelected
-            ? <div className="rg-score-stamp">Nota: {finalScore.toFixed(1)}</div>
-            : <span className="rg-hint">Selecione um nível em cada critério para calcular a nota.</span>)}
+            ? <div className="rg-score-stamp">Nota final: {finalScore.toFixed(1)}</div>
+            : <div className="rg-score-stamp partial">
+                Nota parcial: {partialScore.toFixed(1)}
+                <span className="rg-score-sub">{scoredCount}/{criteria.length} critérios avaliados</span>
+              </div>)}
         </div>
       </div>
     </div>
