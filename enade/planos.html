@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planos · ENADE Explicado</title>
+<meta name="theme-color" content="#141111">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Work+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<header class="topbar solid"><a class="logo" href="index.html">ENADE <span>Explicado</span></a><nav id="usuario" aria-label="Conta" style="margin-left:auto"></nav></header>
+
+<main class="wrapp">
+  <h1>Escolha seu plano</h1>
+  <p class="lead">Acesso a todas as explicações em vídeo e às questões de treino com gabarito. Pagamento seguro pelo Mercado Pago.</p>
+  <div id="ativo"></div>
+  <div class="planos" id="planos"><p class="tcount">Carregando planos…</p></div>
+  <p class="nota">
+    A cobrança é automática a cada período, no cartão cadastrado no Mercado Pago, até você cancelar.
+    Você pode cancelar quando quiser em <a href="conta.html">Minha conta</a> e continua com acesso até o fim do período já pago.
+    Ao assinar, você concorda com os <a href="termos.html">Termos de uso</a> e a <a href="privacidade.html">Política de privacidade</a>.
+  </p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="comum.js"></script>
+<script src="api.js"></script>
+<script>
+(async function () {
+  avisoConfiguracao();
+  montarMenuUsuario();
+  var PERIODO = { 1: "mês", 3: "trimestre", 6: "semestre", 12: "ano" };
+  var e = await Api.estado(), planos = [];
+  try { planos = await Api.planos(); } catch (err) { aviso("Não foi possível carregar os planos.", "erro"); }
+
+  if (e.acesso && !e.admin) {
+    document.getElementById("ativo").innerHTML = '<div class="msg ok">Você já tem uma assinatura ativa' +
+      (e.acessoAte ? ' (acesso até ' + dataBR(e.acessoAte) + ')' : '') + '. <a href="index.html">Ir para os vídeos</a> · <a href="conta.html">Minha conta</a></div>';
+  }
+
+  document.getElementById("planos").innerHTML = planos.length ? planos.map(function (p) {
+    var mensal = p.meses > 1 ? "equivale a " + brl(p.preco / p.meses) + " por mês" : "";
+    return '<article class="plano' + (p.destaque ? " dest" : "") + '">' +
+      (p.destaque ? '<span class="selo">Mais escolhido</span>' : '') +
+      '<h2>' + esc(p.nome) + '</h2><p class="desc">' + esc(p.descricao) + '</p>' +
+      '<div class="preco">' + brl(p.preco) + ' <small>/ ' + PERIODO[p.meses] + '</small></div>' +
+      '<p class="equiv">' + mensal + '</p>' +
+      '<ul>' + (p.beneficios || []).map(function (b) { return '<li>' + esc(b) + '</li>'; }).join("") + '</ul>' +
+      '<button class="btn ' + (p.destaque ? "prim" : "sec") + '" type="button" data-plano="' + esc(p.id) + '"' + (e.acesso && !e.admin ? " disabled" : "") + '>Assinar ' + esc(p.nome) + '</button>' +
+    '</article>';
+  }).join("") : '<p class="tcount">Nenhum plano disponível no momento.</p>';
+
+  document.getElementById("planos").addEventListener("click", async function (ev) {
+    var b = ev.target.closest("[data-plano]");
+    if (!b) return;
+    if (!e.user) { location.href = "entrar.html?aba=cadastro&volta=" + encodeURIComponent("planos.html"); return; }
+    var txt = b.textContent;
+    b.disabled = true; b.textContent = "Abrindo o Mercado Pago…";
+    try { await Api.assinar(b.dataset.plano); }
+    catch (err) { aviso(err.message, "erro"); b.disabled = false; b.textContent = txt; }
+  });
+})();
+</script>
+</body>
+</html>

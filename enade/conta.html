@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minha conta · ENADE Explicado</title>
+<meta name="theme-color" content="#141111">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Work+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<header class="topbar solid"><a class="logo" href="index.html">ENADE <span>Explicado</span></a><nav id="usuario" aria-label="Conta" style="margin-left:auto"></nav></header>
+
+<main class="wrapp" style="max-width:720px">
+  <h1>Minha conta</h1>
+  <div id="retorno"></div>
+
+  <section class="caixa secao">
+    <h2>Assinatura</h2>
+    <div id="assinatura"><p class="tcount">Carregando…</p></div>
+  </section>
+
+  <section class="caixa secao">
+    <h2>Dados pessoais</h2>
+    <form id="fnome">
+      <label class="campo">Nome<input name="nome" autocomplete="name"></label>
+      <label class="campo">E-mail<input name="email" disabled></label>
+      <button class="btn sec" type="submit">Salvar nome</button>
+      <a class="linkbtn" style="margin-left:12px" href="entrar.html?modo=nova-senha" id="trocasenha">Trocar senha</a>
+    </form>
+  </section>
+
+  <section class="caixa secao perigo">
+    <h2>Excluir conta</h2>
+    <p class="hint" style="font-size:14.5px">Apaga sua conta, seu progresso e suas respostas. Isso não pode ser desfeito.
+      Se você tiver uma assinatura ativa, ela será cancelada antes.</p>
+    <button class="btn danger" type="button" id="excluir">Excluir minha conta</button>
+  </section>
+</main>
+
+<dialog id="dlg" style="width:min(460px,calc(100vw - 24px))">
+  <div class="paywall" style="text-align:left">
+    <h2 id="dlgt"></h2>
+    <p id="dlgd"></p>
+    <label class="campo" id="dlgcampo" hidden>Digite EXCLUIR para confirmar<input id="dlgin" autocomplete="off"></label>
+    <div class="actions">
+      <button class="btn prim" type="button" id="dlgok"></button>
+      <button class="btn sec" type="button" id="dlgno">Voltar</button>
+    </div>
+  </div>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="comum.js"></script>
+<script src="api.js"></script>
+<script>
+(async function () {
+  avisoConfiguracao();
+  montarMenuUsuario();
+  var e = await Api.estado();
+  if (!e.user) { location.href = "entrar.html?volta=conta.html"; return; }
+
+  var NOMES = { ativa: "Ativa", pendente: "Aguardando pagamento", pausada: "Pausada", cancelada: "Cancelada" };
+
+  function renderAssinatura() {
+    var a = e.assinatura, box = document.getElementById("assinatura");
+    if (e.admin) { box.innerHTML = '<div class="linha"><span class="rot">Situação</span><span class="status ativa">Administradora (acesso total)</span></div>'; return; }
+    if (!a) {
+      box.innerHTML = '<div class="linha"><span class="rot">Situação</span><span class="status nenhuma">Sem assinatura</span></div>' +
+        '<p style="margin:14px 0 0"><a class="btn prim" href="planos.html">Ver planos</a></p>';
+      return;
+    }
+    var html = '<div class="linha"><span class="rot">Situação</span><span class="status ' + a.status + '">' + NOMES[a.status] + '</span></div>' +
+      '<div class="linha"><span class="rot">Plano</span><span class="val">' + esc(a.plano_id.charAt(0).toUpperCase() + a.plano_id.slice(1)) + '</span></div>';
+    if (e.acessoAte) html += '<div class="linha"><span class="rot">Acesso liberado até</span><span class="val">' + dataBR(e.acessoAte) + '</span></div>';
+    if (a.status === "ativa" && a.proxima_cobranca) html += '<div class="linha"><span class="rot">Próxima cobrança</span><span class="val">' + dataBR(a.proxima_cobranca) + '</span></div>';
+    if (a.status === "pendente") html += '<p class="hint">Assim que o Mercado Pago confirmar o pagamento, seu acesso é liberado automaticamente. Isso costuma levar poucos minutos.</p>';
+    if (a.status === "cancelada" && e.acesso) html += '<p class="hint">A cobrança foi cancelada. Você continua com acesso até ' + dataBR(e.acessoAte) + '.</p>';
+    html += '<p style="margin:16px 0 0;display:flex;gap:10px;flex-wrap:wrap">';
+    if (a.status === "ativa" || a.status === "pausada") html += '<button class="btn danger" type="button" id="cancelar">Cancelar assinatura</button>';
+    if (!e.acesso || a.status === "cancelada") html += '<a class="btn prim" href="planos.html">' + (a.status === "cancelada" ? "Assinar de novo" : "Ver planos") + '</a>';
+    html += '</p>';
+    box.innerHTML = html;
+    var c = document.getElementById("cancelar");
+    if (c) c.addEventListener("click", function () {
+      confirmar("Cancelar assinatura?", "A cobrança automática será interrompida. Você continua com acesso até " +
+        (e.acessoAte ? dataBR(e.acessoAte) : "o fim do período pago") + ".", "Sim, cancelar", false, async function () {
+          await Api.cancelar(); e = await Api.estado(true); renderAssinatura(); aviso("Assinatura cancelada.");
+        });
+    });
+  }
+  renderAssinatura();
+
+  // Voltando do Mercado Pago: confere algumas vezes até o aviso de pagamento chegar
+  if (new URLSearchParams(location.search).get("retorno") === "mp") {
+    document.getElementById("retorno").innerHTML = '<div class="msg ok">Recebemos seu retorno do Mercado Pago. A confirmação do pagamento pode levar alguns minutos; esta página se atualiza sozinha.</div>';
+    for (var i = 0; i < 12 && !e.acesso; i++) {
+      await new Promise(function (r) { setTimeout(r, 5000); });
+      e = await Api.estado(true); renderAssinatura();
+    }
+    if (e.acesso) document.getElementById("retorno").innerHTML = '<div class="msg ok">Pagamento confirmado! <a href="index.html">Começar a assistir</a></div>';
+    history.replaceState(null, "", "conta.html");
+  }
+
+  var f = document.getElementById("fnome");
+  f.elements.nome.value = (e.perfil && e.perfil.nome) || "";
+  f.elements.email.value = e.user.email;
+  f.addEventListener("submit", async function (ev) {
+    ev.preventDefault();
+    try { await Api.salvarNome(f.elements.nome.value.trim()); aviso("Nome salvo."); montarMenuUsuario(); }
+    catch (err) { aviso(erroAmigavel(err), "erro"); }
+  });
+  // Trocar senha: envia link por e-mail (mais seguro que trocar direto)
+  document.getElementById("trocasenha").addEventListener("click", async function (ev) {
+    ev.preventDefault();
+    try { await Api.recuperar(e.user.email); aviso("Enviamos um link para " + e.user.email + " para você criar a nova senha."); }
+    catch (err) { aviso(erroAmigavel(err), "erro"); }
+  });
+
+  document.getElementById("excluir").addEventListener("click", function () {
+    confirmar("Excluir sua conta?", "Todos os seus dados serão apagados: perfil, progresso e respostas. Esta ação não pode ser desfeita.", "Excluir definitivamente", true, async function () {
+      if (e.assinatura && (e.assinatura.status === "ativa" || e.assinatura.status === "pausada")) await Api.cancelar();
+      await Api.excluirConta();
+      location.href = "index.html";
+    });
+  });
+
+  // Janela de confirmação
+  var dlg = document.getElementById("dlg");
+  function confirmar(titulo, texto, botao, digitar, acao) {
+    document.getElementById("dlgt").textContent = titulo;
+    document.getElementById("dlgd").textContent = texto;
+    document.getElementById("dlgcampo").hidden = !digitar;
+    document.getElementById("dlgin").value = "";
+    var ok = document.getElementById("dlgok");
+    ok.textContent = botao;
+    ok.onclick = async function () {
+      if (digitar && document.getElementById("dlgin").value.trim().toUpperCase() !== "EXCLUIR") { aviso("Digite EXCLUIR para confirmar.", "erro"); return; }
+      ok.disabled = true;
+      try { await acao(); dlg.close(); } catch (err) { aviso(erroAmigavel(err), "erro"); } finally { ok.disabled = false; }
+    };
+    dlg.showModal();
+  }
+  document.getElementById("dlgno").addEventListener("click", function () { dlg.close(); });
+})();
+</script>
+</body>
+</html>

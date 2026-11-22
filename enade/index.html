@@ -24,6 +24,7 @@
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
     <span class="t">Filtros</span><span class="n" id="nf" hidden></span>
   </button>
+  <nav id="usuario" aria-label="Conta"></nav>
 </header>
 
 <div class="panel" id="panel" hidden>
@@ -58,7 +59,7 @@
       <button class="pill" type="button" data-g="ano" aria-pressed="false">Ano</button>
       <button class="pill" type="button" data-g="professor" aria-pressed="false">Professor</button>
     </div>
-    <div id="lanes"></div>
+    <div id="lanes"><p class="empty">Carregando vídeos…</p></div>
   </main>
 </div>
 
@@ -86,14 +87,37 @@
   </div>
 </dialog>
 
-<footer>Questões do Exame Nacional de Desempenho dos Estudantes (ENADE/INEP). Vídeos hospedados no YouTube.</footer>
+<!-- Janela "assine para assistir" -->
+<dialog id="pw" aria-labelledby="pwt">
+  <div class="paywall">
+    <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
+    <h2 id="pwt"></h2>
+    <p id="pwd"></p>
+    <div class="actions" id="pwa"></div>
+    <p style="margin:16px 0 0"><button class="linkbtn" type="button" id="pwclose">Agora não</button></p>
+  </div>
+</dialog>
 
-<script src="videos.js"></script>
+<footer>Questões do Exame Nacional de Desempenho dos Estudantes (ENADE/INEP). ·
+  <a href="planos.html">Planos</a> · <a href="termos.html">Termos de uso</a> · <a href="privacidade.html">Privacidade</a></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
 <script src="comum.js"></script>
+<script src="api.js"></script>
 <script src="treino.js"></script>
 <script>
-(function () {
-  var VIDEOS = (window.VIDEOS || []).map(function (v, i) { v._i = i; return v; });
+(async function () {
+  avisoConfiguracao();
+  montarMenuUsuario();
+  // Catálogo público + links liberados para este usuário + progresso dele
+  var SESSAO = await Api.estado();
+  var linhas = [], LINKS = {}, PROG = {};
+  try {
+    var r = await Promise.all([Api.catalogo(), Api.conteudos(), Api.progressos()]);
+    linhas = r[0]; LINKS = r[1]; PROG = r[2];
+  } catch (e) { console.error(e); aviso("Não foi possível carregar os vídeos. Recarregue a página.", "erro"); }
+  var VIDEOS = linhas.map(function (v, i) { v.youtube = LINKS[v.id] || ""; v._i = i; return v; });
   var FILTROS = ["curso", "ano", "tipo", "tema", "professor"];
   var NOMES = { curso: "Curso", ano: "Ano", tipo: "Tipo", tema: "Tema", professor: "Professor" };
   var estado = { q: "", sort: "recente", g: "curso" };
@@ -103,8 +127,8 @@
   var selects = {};
   document.querySelectorAll("select[data-f]").forEach(function (s) { selects[s.dataset.f] = s; });
 
-  // A barrinha embaixo da miniatura mostra quanto do vídeo o aluno já assistiu (salvo só neste navegador).
-  function card(v) { return cardHTML(v, v._i, Treino.fracao(ytId(v.youtube))); }
+  // A barrinha embaixo da miniatura mostra quanto do vídeo o aluno já assistiu.
+  function card(v) { return cardHTML(v, v._i, PROG[v.id] ? PROG[v.id].fracao : 0); }
 
   function norm(s) { return String(s == null ? "" : s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
   VIDEOS.forEach(function (v) {
@@ -148,7 +172,7 @@
 
   // ---------- Destaque ----------
   function escolherDestaque() {
-    var com = VIDEOS.filter(function (v) { return ytId(v.youtube); });
+    var com = VIDEOS.filter(function (v) { return v.tem_video; });
     var marcados = com.filter(function (v) { return v.destaque; });
     if (marcados.length) return marcados[Math.floor(Math.random() * marcados.length)];
     return com[com.length - 1] || VIDEOS[VIDEOS.length - 1];
@@ -159,7 +183,7 @@
     var id = ytId(v.youtube);
     var bg = id
       ? '<img class="hero-bg" alt="" src="https://i.ytimg.com/vi/' + id + '/maxresdefault.jpg" onerror="this.onerror=null;this.src=\'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg\'">'
-      : '<div class="hero-bg ph"></div>';
+      : v.capa ? '<img class="hero-bg" alt="" src="' + esc(v.capa) + '">' : '<div class="hero-bg ph"></div>';
     h.innerHTML = bg +
       '<div class="hero-txt">' +
         '<span class="kicker">' + (v.destaque ? "Em destaque" : "Novidade") + '</span>' +
@@ -170,6 +194,7 @@
         (v.descricao ? '<p class="d">' + esc(v.descricao) + '</p>' : '<p class="d"></p>') +
         '<div class="actions">' +
           (id ? '<button class="btn play" type="button" data-play="' + v._i + '">' + PLAY_ICON + ' Assistir</button>'
+              : v.tem_video ? '<button class="btn play" type="button" data-lock="' + v._i + '">' + LOCK_ICON.replace(/12/g, "18") + (v.gratuito ? ' Assistir grátis' : ' Assine para assistir') + '</button>'
               : '<button class="btn play" type="button" disabled>Em breve</button>') +
           '<button class="btn sec" type="button" data-curso="' + esc(v.curso) + '">Mais de ' + esc(v.curso) + '</button>' +
         '</div>' +
@@ -296,14 +321,40 @@
   document.body.addEventListener("click", function (e) {
     var c = e.target.closest("[data-curso]");
     if (c) { estado.curso = c.dataset.curso; render(); window.scrollTo(0, 0); return; }
+    var l = e.target.closest("[data-lock]");
+    if (l) { abrirPaywall(VIDEOS[+l.dataset.lock]); return; }
     var b = e.target.closest("[data-play]");
     if (!b) return;
     var v = VIDEOS[+b.dataset.play];
-    Treino.abrir(v, function () { atualizarCards(v); });
+    Treino.abrir(v, PROG[v.id], function (p) { if (p) PROG[v.id] = p; atualizarCards(v); });
   });
+
+  // Quem clica num vídeo bloqueado recebe o convite certo para a situação dele.
+  var pw = $("#pw");
+  function abrirPaywall(v) {
+    var volta = encodeURIComponent("index.html");
+    var t, d, a;
+    if (!SESSAO.user && v.gratuito) {
+      t = "Assista grátis"; d = "Este vídeo é aberto para quem tem cadastro. Crie sua conta em menos de um minuto.";
+      a = '<a class="btn prim" href="entrar.html?aba=cadastro&volta=' + volta + '">Criar conta grátis</a><a class="btn sec" href="entrar.html?volta=' + volta + '">Já tenho conta</a>';
+    } else if (!SESSAO.user) {
+      t = "Conteúdo para assinantes"; d = "Assine para assistir a todas as explicações e fazer as questões de treino com gabarito.";
+      a = '<a class="btn prim" href="planos.html">Ver planos</a><a class="btn sec" href="entrar.html?volta=' + volta + '">Já sou assinante</a>';
+    } else if (SESSAO.assinatura && SESSAO.assinatura.status === "pendente") {
+      t = "Pagamento em confirmação"; d = "Recebemos seu pedido de assinatura. Assim que o Mercado Pago confirmar o pagamento, os vídeos são liberados.";
+      a = '<a class="btn prim" href="conta.html">Ver minha assinatura</a>';
+    } else {
+      t = "Assine para assistir"; d = "Sua conta ainda não tem um plano ativo. Escolha um plano para liberar todos os vídeos.";
+      a = '<a class="btn prim" href="planos.html">Ver planos</a>';
+    }
+    $("#pwt").textContent = t; $("#pwd").textContent = d; $("#pwa").innerHTML = a;
+    pw.showModal();
+  }
+  $("#pwclose").addEventListener("click", function () { pw.close(); });
+  pw.addEventListener("click", function (e) { if (e.target === pw) pw.close(); });
   // Ao fechar o vídeo, a barrinha de progresso dos cards desse vídeo é atualizada.
   function atualizarCards(v) {
-    document.querySelectorAll('.thumb[data-play="' + v._i + '"]').forEach(function (t) {
+    document.querySelectorAll('#lanes .thumb[data-play="' + v._i + '"], #grid .thumb[data-play="' + v._i + '"]').forEach(function (t) {
       var novo = document.createElement("div");
       novo.innerHTML = card(v);
       t.closest(".card").replaceWith(novo.firstChild);

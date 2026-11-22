@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administração · ENADE Explicado</title>
+<meta name="theme-color" content="#141111">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Work+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+<style>
+.adm-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:16px}
+.adm-top h2{font-size:22px}
+.secao-adm{margin-bottom:34px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:20px;margin:0 0 18px}
+.form .full{grid-column:1/-1}
+@media (max-width:700px){.form{grid-template-columns:1fr}}
+.form label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:14px}
+.form .checks{display:flex;flex-wrap:wrap;gap:10px 24px}
+.form label.check{flex-direction:row;align-items:center;gap:8px;font-weight:600}
+.form input,.form textarea,.form select{font:inherit;font-weight:400;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:9px 11px;width:100%}
+.form input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}
+.form textarea{min-height:70px;resize:vertical}
+.qbuilder{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:20px;margin:0 0 18px}
+.qbhead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px 20px}
+.qbhead h3{font-size:18px}
+.qbbtns{display:flex;flex-wrap:wrap;gap:8px}
+.qbbtns .btn,.acoes .btn{font-size:14px;padding:9px 16px}
+.qb{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:14px;display:flex;flex-direction:column;gap:10px}
+.qbtop{display:flex;justify-content:space-between;align-items:center}
+.qb label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:14px}
+.qb textarea,.qb input:not([type=radio]){font:inherit;font-weight:400;color:var(--ink);background:var(--bg2);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%}
+.qb textarea{min-height:70px;resize:vertical}
+.qb fieldset{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
+.qb legend{font-weight:600;font-size:14px;margin-bottom:4px;padding:0}
+.altrow{display:flex;align-items:center;gap:8px}
+.altrow input[type=radio]{width:18px;height:18px;accent-color:#7FD99A;flex:none}
+.altrow .L{flex:none;width:20px;font-weight:700;color:var(--muted)}
+.acoes{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.prevbox{max-width:320px}
+.tabela textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%;min-height:62px;font-size:13.5px}
+.tabela select{padding:6px 8px;font-size:14px}
+.tabela input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}
+</style>
+</head>
+<body>
+<header class="topbar solid"><a class="logo" href="index.html">ENADE <span>Explicado</span></a><nav id="usuario" aria-label="Conta" style="margin-left:auto"></nav></header>
+
+<main class="wrapp" id="app"><p class="tcount">Carregando…</p></main>
+
+<template id="tpl">
+  <h1>Administração</h1>
+  <p class="lead">Cadastre vídeos e questões, e ajuste os planos. Tudo é salvo direto no banco de dados.</p>
+
+  <section class="secao-adm" id="sec-lista">
+    <div class="adm-top"><h2>Vídeos</h2><button class="btn prim" type="button" id="novo">+ Novo vídeo</button></div>
+    <div class="tabwrap"><table class="tabela" id="tvideos"></table></div>
+  </section>
+
+  <section class="secao-adm" id="sec-form" hidden>
+    <div class="adm-top"><h2 id="ftitulo">Novo vídeo</h2></div>
+    <form class="form" id="f" autocomplete="off">
+      <label class="full">Link do vídeo no YouTube
+        <input name="youtube" placeholder="https://www.youtube.com/watch?v=... (deixe vazio para mostrar como &quot;Em breve&quot;)">
+        <span class="hint" id="yhint">Use vídeo "não listado" no YouTube. Só assinantes recebem este link.</span>
+      </label>
+      <label class="full">Título<input name="titulo" required placeholder="Ex.: Matriz SWOT aplicada ao estudo de caso"></label>
+      <label>Curso<input name="curso" list="l-curso" required placeholder="Ex.: Administração"></label>
+      <label>Ano da prova<input name="ano" type="number" min="2004" max="2100" placeholder="Ex.: 2022"></label>
+      <label>Número da questão<input name="questao" type="number" min="1" max="99" placeholder="Ex.: 14"></label>
+      <label>Tipo de questão<select name="tipo"><option>Componente Específico</option><option>Formação Geral</option></select></label>
+      <label>Tema<input name="tema" list="l-tema" placeholder="Ex.: Marketing"></label>
+      <label>Professor<input name="professor" list="l-professor" placeholder="Ex.: Profa. Laila"></label>
+      <label>Duração<input name="duracao" placeholder="Ex.: 6:40"><span class="hint">Usada também para conferir os 90% assistidos.</span></label>
+      <label>Imagem de capa (opcional)<input name="capa" placeholder="https://..."><span class="hint">Aparece para quem não assina. Não use a miniatura do YouTube.</span></label>
+      <label class="full">Descrição<textarea name="descricao" placeholder="Uma ou duas frases sobre o que o vídeo explica."></textarea></label>
+      <div class="full checks">
+        <label class="check"><input type="checkbox" name="publicado" checked> Publicado</label>
+        <label class="check"><input type="checkbox" name="destaque"> Destaque no topo</label>
+        <label class="check"><input type="checkbox" name="gratuito"> Grátis (amostra para quem só tem cadastro)</label>
+      </div>
+      <datalist id="l-curso"></datalist><datalist id="l-tema"></datalist><datalist id="l-professor"></datalist>
+    </form>
+
+    <section class="qbuilder">
+      <div class="qbhead">
+        <div><h3>Questões de treino</h3>
+        <p class="hint" style="margin:4px 0 0">Liberadas depois que o aluno assiste a 90% do vídeo. O gabarito fica protegido no servidor.</p></div>
+        <div class="qbbtns">
+          <button class="btn sec" type="button" data-add="objetiva">+ Questão objetiva</button>
+          <button class="btn sec" type="button" data-add="discursiva">+ Questão discursiva</button>
+        </div>
+      </div>
+      <div id="qlist"></div>
+    </section>
+
+    <div class="out" style="display:grid;grid-template-columns:320px 1fr;gap:24px;align-items:start">
+      <div><h3 style="font-size:16px;margin-bottom:10px">Prévia do card</h3><div class="prevbox" id="prev"></div></div>
+      <div class="acoes" style="align-self:end">
+        <button class="btn prim" type="button" id="salvar">Salvar vídeo</button>
+        <button class="btn sec" type="button" id="cancelarf">Cancelar</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="secao-adm" id="sec-planos">
+    <div class="adm-top"><h2>Planos e preços</h2><button class="btn sec" type="button" id="novoplano">+ Novo plano</button></div>
+    <p class="hint">Mudar o preço vale para novas assinaturas. Quem já assina continua pagando o valor contratado.</p>
+    <div class="tabwrap"><table class="tabela" id="tplanos"></table></div>
+  </section>
+</template>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="comum.js"></script>
+<script src="api.js"></script>
+<script>
+(async function () {
+  avisoConfiguracao();
+  montarMenuUsuario();
+  var app = document.getElementById("app");
+  var e = await Api.estado();
+  if (!e.user) { location.href = "entrar.html?volta=admin.html"; return; }
+  if (!e.admin) { app.innerHTML = '<h1>Acesso restrito</h1><p class="lead">Esta página é só para administradores. <a href="index.html">Voltar</a></p>'; return; }
+  app.innerHTML = document.getElementById("tpl").innerHTML;
+
+  var $ = function (s) { return document.querySelector(s); };
+  var f = $("#f"), qlist = $("#qlist"), LETRAS = "ABCDE", VIDEOS = [], editando = null, nq = 0;
+
+  // ---------- Lista de vídeos ----------
+  async function carregarLista() {
+    var r = await Promise.all([Api.admin.videos(), Api.admin.contarQuestoes(), Api.conteudos()]);
+    VIDEOS = r[0];
+    var nqs = r[1], links = r[2];
+    $("#tvideos").innerHTML = '<tr><th>Título</th><th>Curso</th><th>Ano</th><th>Questões</th><th>Situação</th><th></th></tr>' +
+      (VIDEOS.length ? VIDEOS.map(function (v) {
+        return '<tr><td><strong>' + esc(v.titulo) + '</strong></td><td>' + esc(v.curso) + '</td><td>' + esc(v.ano || "") + '</td><td>' + (nqs[v.id] || 0) + '</td><td>' +
+          '<span class="tag2' + (v.publicado ? " on" : "") + '">' + (v.publicado ? "Publicado" : "Rascunho") + '</span> ' +
+          (links[v.id] ? '' : '<span class="tag2">Sem link</span> ') + (v.gratuito ? '<span class="tag2 on">Grátis</span> ' : '') + (v.destaque ? '<span class="tag2 on">Destaque</span>' : '') +
+          '</td><td style="white-space:nowrap"><button class="mini" type="button" data-ed="' + v.id + '">Editar</button> <button class="mini del" type="button" data-del="' + v.id + '">Excluir</button></td></tr>';
+      }).join("") : '<tr><td colspan="6" class="hint">Nenhum vídeo cadastrado ainda.</td></tr>');
+    ["curso", "tema", "professor"].forEach(function (k) {
+      var vals = {}; VIDEOS.forEach(function (v) { if (v[k]) vals[v[k]] = 1; });
+      $("#l-" + k).innerHTML = Object.keys(vals).sort().map(function (x) { return '<option value="' + esc(x) + '">'; }).join("");
+    });
+  }
+  $("#tvideos").addEventListener("click", async function (ev) {
+    var ed = ev.target.closest("[data-ed]"), del = ev.target.closest("[data-del]");
+    if (ed) abrirForm(await Api.admin.obter(+ed.dataset.ed));
+    if (del) {
+      var v = VIDEOS.find(function (x) { return x.id === +del.dataset.del; });
+      if (!confirm('Excluir "' + v.titulo + '"? As questões e o progresso dos alunos neste vídeo também serão apagados.')) return;
+      try { await Api.admin.excluir(v.id); aviso("Vídeo excluído."); carregarLista(); } catch (err) { aviso(erroAmigavel(err), "erro"); }
+    }
+  });
+
+  // ---------- Formulário ----------
+  function abrirForm(v) {
+    editando = v ? v.id : null;
+    f.reset(); qlist.innerHTML = "";
+    $("#ftitulo").textContent = v ? "Editar vídeo" : "Novo vídeo";
+    if (v) {
+      ["titulo", "curso", "ano", "questao", "tipo", "tema", "professor", "duracao", "capa", "descricao"].forEach(function (k) { f.elements[k].value = v[k] == null ? "" : v[k]; });
+      f.elements.youtube.value = v.youtube_id ? "https://youtu.be/" + v.youtube_id : "";
+      ["publicado", "destaque", "gratuito"].forEach(function (k) { f.elements[k].checked = !!v[k]; });
+      (v.questoes || []).forEach(function (q) { novaQuestao(q.tipo, q); });
+    }
+    $("#sec-form").hidden = false; $("#sec-lista").hidden = true; $("#sec-planos").hidden = true;
+    window.scrollTo(0, 0);
+    atualizarPrevia();
+  }
+  function fecharForm() { $("#sec-form").hidden = true; $("#sec-lista").hidden = false; $("#sec-planos").hidden = false; }
+  $("#novo").addEventListener("click", function () { abrirForm(null); });
+  $("#cancelarf").addEventListener("click", fecharForm);
+
+  function novaQuestao(tipo, dados) {
+    var n = ++nq, el = document.createElement("div");
+    dados = dados || {};
+    el.className = "qb"; el.dataset.tipo = tipo;
+    var html = '<div class="qbtop"><strong>' + (tipo === "discursiva" ? "Questão discursiva" : "Questão objetiva") + '</strong>' +
+      '<button class="linkbtn" type="button" data-rm>Remover</button></div>' +
+      '<label>Enunciado<textarea data-k="enunciado" placeholder="Texto da questão. Pode ter várias linhas."></textarea></label>';
+    if (tipo === "discursiva") {
+      html += '<label>Padrão de resposta (aparece no gabarito)<textarea data-k="resposta"></textarea></label>';
+    } else {
+      html += '<fieldset><legend>Alternativas <span class="hint">(marque a correta)</span></legend>';
+      for (var i = 0; i < 5; i++) {
+        html += '<div class="altrow"><input type="radio" name="c' + n + '" value="' + LETRAS[i] + '" aria-label="Alternativa ' + LETRAS[i] + ' é a correta">' +
+          '<span class="L">' + LETRAS[i] + '</span><input data-alt="' + i + '" placeholder="Texto da alternativa ' + LETRAS[i] + '"></div>';
+      }
+      html += '</fieldset><label>Comentário do gabarito (opcional)<textarea data-k="comentario" placeholder="Por que essa alternativa está certa?"></textarea></label>';
+    }
+    html += '<label>Link de imagem (opcional)<input data-k="imagem" placeholder="https://..."></label>';
+    el.innerHTML = html;
+    qlist.appendChild(el);
+    ["enunciado", "resposta", "comentario", "imagem"].forEach(function (k) { var x = el.querySelector('[data-k="' + k + '"]'); if (x && dados[k]) x.value = dados[k]; });
+    if (tipo !== "discursiva") {
+      (dados.alternativas || []).forEach(function (a, i) { var x = el.querySelector('[data-alt="' + i + '"]'); if (x) x.value = a; });
+      var c = el.querySelector('input[type=radio][value="' + (dados.correta || "A") + '"]') || el.querySelector("input[type=radio]");
+      c.checked = true;
+    }
+    if (!dados.enunciado) el.querySelector("textarea").focus();
+  }
+  function lerQuestoes() {
+    return Array.prototype.map.call(qlist.children, function (el) {
+      var val = function (k) { var x = el.querySelector('[data-k="' + k + '"]'); return x ? x.value.trim() : ""; };
+      var q = { tipo: el.dataset.tipo, enunciado: val("enunciado"), imagem: val("imagem") };
+      if (q.tipo === "discursiva") q.resposta = val("resposta");
+      else {
+        var alts = Array.prototype.map.call(el.querySelectorAll("[data-alt]"), function (i) { return i.value.trim(); });
+        while (alts.length > 2 && !alts[alts.length - 1]) alts.pop();
+        q.alternativas = alts;
+        q.correta = el.querySelector("input[type=radio]:checked").value;
+        q.comentario = val("comentario");
+      }
+      return q;
+    }).filter(function (q) { return q.enunciado; });
+  }
+  document.querySelectorAll("[data-add]").forEach(function (b) { b.addEventListener("click", function () { novaQuestao(b.dataset.add); }); });
+  qlist.addEventListener("click", function (ev) { if (ev.target.matches("[data-rm]")) ev.target.closest(".qb").remove(); });
+
+  function dados() {
+    var d = { id: editando, youtube_id: ytId(f.elements.youtube.value) };
+    ["titulo", "curso", "ano", "questao", "tipo", "tema", "professor", "duracao", "capa", "descricao"].forEach(function (k) { d[k] = f.elements[k].value.trim(); });
+    ["publicado", "destaque", "gratuito"].forEach(function (k) { d[k] = f.elements[k].checked; });
+    d.questoes = lerQuestoes();
+    return d;
+  }
+  function atualizarPrevia() {
+    var raw = f.elements.youtube.value.trim(), d = dados();
+    $("#yhint").textContent = !raw ? 'Sem link: o vídeo aparece como "Em breve".' : ytId(raw) ? "Vídeo reconhecido: " + ytId(raw) : "Não reconheci esse link. Copie o endereço direto do vídeo no YouTube.";
+    $("#prev").innerHTML = cardHTML(Object.assign({}, d, { youtube: d.youtube_id, tem_video: !!d.youtube_id, n_questoes: d.questoes.length,
+      titulo: d.titulo || "Título do vídeo", curso: d.curso || "Curso", ano: d.ano || "2024" }), 0, 0);
+  }
+  f.addEventListener("input", atualizarPrevia);
+  qlist.addEventListener("input", atualizarPrevia);
+  qlist.addEventListener("click", function () { setTimeout(atualizarPrevia, 0); });
+
+  $("#salvar").addEventListener("click", async function () {
+    var d = dados();
+    if (!d.titulo || !d.curso) { aviso("Preencha pelo menos o título e o curso.", "erro"); return; }
+    if (f.elements.youtube.value.trim() && !d.youtube_id) { aviso("O link do YouTube não foi reconhecido.", "erro"); return; }
+    var semCerta = d.questoes.some(function (q) { return q.tipo === "objetiva" && q.alternativas.filter(Boolean).length < 2; });
+    if (semCerta) { aviso("Cada questão objetiva precisa de pelo menos 2 alternativas.", "erro"); return; }
+    var b = this; b.disabled = true; b.textContent = "Salvando…";
+    try {
+      await Api.admin.salvar(d);
+      aviso("Vídeo salvo!"); fecharForm(); carregarLista();
+    } catch (err) { aviso(erroAmigavel(err), "erro"); }
+    finally { b.disabled = false; b.textContent = "Salvar vídeo"; }
+  });
+
+  // ---------- Planos ----------
+  var PERIODOS = [[1, "Mensal"], [3, "Trimestral"], [6, "Semestral"], [12, "Anual"]];
+  async function carregarPlanos() {
+    var ps = await Api.admin.planos();
+    $("#tplanos").innerHTML = '<tr><th>Código</th><th>Nome</th><th>Preço (R$)</th><th>Cobrança</th><th>Benefícios (um por linha)</th><th>Destaque</th><th>Ativo</th><th></th></tr>' +
+      ps.map(linhaPlano).join("");
+  }
+  function linhaPlano(p) {
+    return '<tr data-id="' + esc(p.id || "") + '">' +
+      '<td>' + (p.id ? '<code>' + esc(p.id) + '</code>' : '<input data-p="id" placeholder="ex.: trimestral" style="width:120px">') + '</td>' +
+      '<td><input data-p="nome" value="' + esc(p.nome || "") + '"><input data-p="descricao" value="' + esc(p.descricao || "") + '" placeholder="Descrição curta" style="margin-top:4px"></td>' +
+      '<td><input data-p="preco" type="number" step="0.01" min="1" value="' + esc(p.preco || "") + '" style="width:100px"></td>' +
+      '<td><select data-p="meses">' + PERIODOS.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === p.meses ? " selected" : "") + '>' + x[1] + '</option>'; }).join("") + '</select></td>' +
+      '<td><textarea data-p="beneficios">' + esc((p.beneficios || []).join("\n")) + '</textarea></td>' +
+      '<td><input type="checkbox" data-p="destaque"' + (p.destaque ? " checked" : "") + '></td>' +
+      '<td><input type="checkbox" data-p="ativo"' + (p.ativo !== false ? " checked" : "") + '></td>' +
+      '<td><button class="mini" type="button" data-salvarplano>Salvar</button></td></tr>';
+  }
+  $("#novoplano").addEventListener("click", function () { $("#tplanos").insertAdjacentHTML("beforeend", linhaPlano({ meses: 1, ativo: true })); });
+  $("#tplanos").addEventListener("click", async function (ev) {
+    if (!ev.target.matches("[data-salvarplano]")) return;
+    var tr = ev.target.closest("tr"), g = function (k) { return tr.querySelector('[data-p="' + k + '"]'); };
+    var p = {
+      id: tr.dataset.id || (g("id").value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "")),
+      nome: g("nome").value.trim(), descricao: g("descricao").value.trim(), preco: Number(g("preco").value),
+      meses: Number(g("meses").value), beneficios: g("beneficios").value.split("\n").map(function (x) { return x.trim(); }).filter(Boolean),
+      destaque: g("destaque").checked, ativo: g("ativo").checked,
+      ordem: Array.prototype.indexOf.call(tr.parentNode.children, tr)
+    };
+    if (!p.id || !p.nome || !(p.preco > 0)) { aviso("Preencha código, nome e preço.", "erro"); return; }
+    try { await Api.admin.salvarPlano(p); aviso("Plano salvo."); carregarPlanos(); } catch (err) { aviso(erroAmigavel(err), "erro"); }
+  });
+
+  try { await Promise.all([carregarLista(), carregarPlanos()]); }
+  catch (err) { aviso(erroAmigavel(err), "erro"); }
+})();
+</script>
+</body>
+</html>
