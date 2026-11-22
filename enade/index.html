@@ -98,10 +98,11 @@
   </div>
 </dialog>
 
-<footer>Questões do Exame Nacional de Desempenho dos Estudantes (ENADE/INEP). ·
+<footer>Questões do Exame Nacional de Desempenho dos Estudantes (ENADE/INEP) ·
   <a href="planos.html">Planos</a> · <a href="termos.html">Termos de uso</a> · <a href="privacidade.html">Privacidade</a></footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/player.js@0.1.0/dist/player-0.1.0.min.js"></script>
 <script src="config.js"></script>
 <script src="comum.js"></script>
 <script src="api.js"></script>
@@ -117,7 +118,7 @@
     var r = await Promise.all([Api.catalogo(), Api.conteudos(), Api.progressos()]);
     linhas = r[0]; LINKS = r[1]; PROG = r[2];
   } catch (e) { console.error(e); aviso("Não foi possível carregar os vídeos. Recarregue a página.", "erro"); }
-  var VIDEOS = linhas.map(function (v, i) { v.youtube = LINKS[v.id] || ""; v._i = i; return v; });
+  var VIDEOS = linhas.map(function (v, i) { v.bunny = LINKS[v.id] || ""; v._i = i; return v; });
   var FILTROS = ["curso", "ano", "tipo", "tema", "professor"];
   var NOMES = { curso: "Curso", ano: "Ano", tipo: "Tipo", tema: "Tema", professor: "Professor" };
   var estado = { q: "", sort: "recente", g: "curso" };
@@ -173,6 +174,7 @@
   // ---------- Destaque ----------
   function escolherDestaque() {
     var com = VIDEOS.filter(function (v) { return v.tem_video; });
+    if (!com.length) com = VIDEOS;
     var marcados = com.filter(function (v) { return v.destaque; });
     if (marcados.length) return marcados[Math.floor(Math.random() * marcados.length)];
     return com[com.length - 1] || VIDEOS[VIDEOS.length - 1];
@@ -180,9 +182,9 @@
   function renderHero() {
     var v = escolherDestaque(), h = $("#hero");
     if (!v) { h.innerHTML = '<div class="hero-bg ph"></div><div class="hero-txt"><h1>Em breve</h1><p class="d">Os primeiros vídeos estão chegando.</p></div>'; return; }
-    var id = ytId(v.youtube);
-    var bg = id
-      ? '<img class="hero-bg" alt="" src="https://i.ytimg.com/vi/' + id + '/maxresdefault.jpg" onerror="this.onerror=null;this.src=\'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg\'">'
+    var id = bunnyId(v.bunny);
+    var bg = id && miniatura(id)
+      ? '<img class="hero-bg" alt="" src="' + miniatura(id) + '">'
       : v.capa ? '<img class="hero-bg" alt="" src="' + esc(v.capa) + '">' : '<div class="hero-bg ph"></div>';
     h.innerHTML = bg +
       '<div class="hero-txt">' +

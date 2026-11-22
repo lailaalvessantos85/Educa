@@ -303,3 +303,4 @@ a.btn{text-decoration:none}
 .mini.del{color:var(--accent2)}
 .tag2{font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--surface2);color:var(--muted)}
 .tag2.on{background:rgba(127,217,154,.18);color:#7FD99A}
+.player .carregando{height:100%;display:grid;place-items:center;color:var(--muted);padding:20px;text-align:center}

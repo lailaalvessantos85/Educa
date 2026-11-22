@@ -13,10 +13,11 @@ com questões de treino liberadas depois de assistir.
 - **Planos** (`planos.html`): assinatura recorrente pelo Mercado Pago.
 - **Minha conta** (`conta.html`): situação da assinatura, cancelamento (o acesso continua até o fim do período pago),
   troca de nome e senha, exclusão da conta (LGPD).
-- **Vídeos e treino**: só assinantes recebem o link do vídeo. As questões liberam quando o aluno assiste a 90% do vídeo,
+- **Vídeos e treino**: os vídeos ficam no Bunny Stream. Só assinantes recebem o link, que é assinado pelo servidor e expira em 3 horas. As questões liberam quando o aluno assiste a 90% do vídeo,
   conferido pelo servidor. O gabarito fica protegido no banco e só é enviado depois das respostas.
 - **Vídeos grátis**: marque "Grátis" no cadastro do vídeo para liberá-lo a quem só tem conta (amostra).
-- **Administração** (`admin.html`): cadastrar e editar vídeos e questões, e mudar planos e preços. Só para administradores.
+- **Administração** (`admin.html`): cadastrar e editar vídeos e questões, e mudar planos e preços. Só para administradores,
+  com **verificação em duas etapas** obrigatória (código de um aplicativo autenticador no celular).
 
 ## Arquivos
 
@@ -28,11 +29,11 @@ com questões de treino liberadas depois de assistir.
 | `admin.html` | Painel de administração |
 | `termos.html`, `privacidade.html` | Rascunhos de Termos de uso e Política de privacidade (revisar antes de vender) |
 | `api.js` | Toda a comunicação com o Supabase |
-| `treino.js` | Acompanhamento do vídeo e questões de treino |
+| `treino.js` | Player do Bunny, acompanhamento dos 90% assistidos e questões de treino |
 | `comum.js`, `estilo.css` | Cards e visual |
 | `supabase/schema.sql` | Banco de dados e regras de acesso |
 | `supabase/exemplos.sql` | Vídeos de exemplo (opcional) |
-| `supabase/functions/` | Funções do servidor: criar e cancelar assinatura, receber avisos do Mercado Pago |
+| `supabase/functions/` | Funções do servidor: criar e cancelar assinatura, receber avisos do Mercado Pago, gerar link assinado do vídeo |
 
 ## Filtros da vitrine
 

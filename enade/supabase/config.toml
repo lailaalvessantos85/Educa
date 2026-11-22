@@ -9,3 +9,6 @@ verify_jwt = true
 
 [functions.cancelar-assinatura]
 verify_jwt = true
+
+[functions.link-video]
+verify_jwt = true

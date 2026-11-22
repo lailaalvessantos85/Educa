@@ -1,12 +1,15 @@
 // Funções usadas pela página principal e pelo gerador de cards.
 
-// Aceita link do YouTube em qualquer formato (watch, youtu.be, shorts, embed) ou só o ID.
-function ytId(valor) {
-  if (!valor) return "";
-  var v = String(valor).trim();
-  if (/^[\w-]{11}$/.test(v)) return v;
-  var m = v.match(/(?:youtu\.be\/|[?&]v=|\/shorts\/|\/embed\/|\/live\/)([\w-]{11})/);
-  return m ? m[1] : "";
+// ID do vídeo no Bunny Stream (formato 0a1b2c3d-...). Aceita o ID puro ou um link que o contenha
+// (página do vídeo no painel, link de embed ou de "play").
+function bunnyId(valor) {
+  var m = String(valor || "").match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  return m ? m[0].toLowerCase() : "";
+}
+// Miniatura gerada pelo Bunny (precisa do "CDN Hostname" da biblioteca no config.js)
+function miniatura(id) {
+  var host = window.CONFIG && window.CONFIG.BUNNY_CDN_HOST;
+  return id && host ? "https://" + host.replace(/^https?:\/\//, "").replace(/\/$/, "") + "/" + id + "/thumbnail.jpg" : "";
 }
 
 function esc(s) {
@@ -19,9 +22,9 @@ var PLAY_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="tr
 
 var LOCK_ICON = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
 
-// v.youtube só vem preenchido quando o usuário pode assistir. v.tem_video diz se o vídeo já existe.
+// v.bunny só vem preenchido quando o usuário pode assistir. v.tem_video diz se o vídeo já existe.
 function cardHTML(v, i, progresso) {
-  var id = ytId(v.youtube);
+  var id = bunnyId(v.bunny);
   var fg = v.tipo === "Formação Geral";
   var badge = v.tipo ? '<span class="badge ' + (fg ? "fg" : "ce") + '" title="' + esc(v.tipo) + '">' + (fg ? "FORMAÇÃO GERAL" : "ESPECÍFICA") + '</span>' : "";
   var q = '<span class="q"><small>ENADE ' + esc(v.ano) + '</small>' + (v.questao ? "Questão " + esc(v.questao) : "") + '</span>';
@@ -29,7 +32,7 @@ function cardHTML(v, i, progresso) {
   var thumb;
   if (id) {
     thumb = '<button class="thumb" type="button" data-play="' + i + '" aria-label="Assistir: ' + esc(v.titulo) + '">' +
-        '<img loading="lazy" src="https://i.ytimg.com/vi/' + id + '/hqdefault.jpg" alt="">' +
+        (miniatura(id) ? '<img loading="lazy" src="' + miniatura(id) + '" alt="" onerror="this.remove()">' : capa) +
         badge + q + (v.duracao ? '<span class="dur">' + esc(v.duracao) + '</span>' : '') +
         (v.gratuito ? '<span class="free">GRÁTIS</span>' : '') +
         (progresso > 0 ? '<span class="prog" aria-label="Assistido ' + Math.round(progresso * 100) + '%"><i style="width:' + Math.round(progresso * 100) + '%"></i></span>' : '') +

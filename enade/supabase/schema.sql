@@ -36,9 +36,12 @@ drop trigger if exists ao_criar_usuario on auth.users;
 create trigger ao_criar_usuario after insert on auth.users
   for each row execute function public.criar_perfil();
 
+-- Admin só vale com verificação em duas etapas concluída nesta sessão (aal2).
+-- Sem o código do aplicativo autenticador, a conta de admin funciona como a de um aluno comum.
 create or replace function public.is_admin()
 returns boolean language sql stable security definer set search_path = public as $$
-  select coalesce((select admin from public.perfis where id = auth.uid()), false);
+  select coalesce((select admin from public.perfis where id = auth.uid()), false)
+     and coalesce(auth.jwt()->>'aal', '') = 'aal2';
 $$;
 
 -- ---------------------------------------------------------------------
@@ -107,9 +110,11 @@ create table if not exists public.videos (
   criado_em   timestamptz not null default now()
 );
 
+-- ID do vídeo no Bunny Stream. Só quem pode assistir lê; o link de reprodução
+-- é gerado pela função link-video, assinado e com validade curta.
 create table if not exists public.videos_conteudo (
   video_id    bigint primary key references public.videos(id) on delete cascade,
-  youtube_id  text not null check (youtube_id ~ '^[A-Za-z0-9_-]{11}$')
+  bunny_id    text not null check (bunny_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 );
 
 create table if not exists public.questoes (
@@ -294,9 +299,9 @@ begin
     where id = v_id;
   end if;
 
-  if coalesce(p->>'youtube_id', '') <> '' then
-    insert into public.videos_conteudo (video_id, youtube_id) values (v_id, p->>'youtube_id')
-    on conflict (video_id) do update set youtube_id = excluded.youtube_id;
+  if coalesce(p->>'bunny_id', '') <> '' then
+    insert into public.videos_conteudo (video_id, bunny_id) values (v_id, lower(p->>'bunny_id'))
+    on conflict (video_id) do update set bunny_id = excluded.bunny_id;
   else
     delete from public.videos_conteudo where video_id = v_id;
   end if;
@@ -329,7 +334,7 @@ begin
   if not public.is_admin() then raise exception 'apenas administradores' using errcode = '42501'; end if;
   return (
     select to_jsonb(v) || jsonb_build_object(
-      'youtube_id', (select youtube_id from public.videos_conteudo where video_id = v.id),
+      'bunny_id', (select bunny_id from public.videos_conteudo where video_id = v.id),
       'questoes', coalesce((
         select jsonb_agg(jsonb_build_object('tipo', q.tipo, 'enunciado', q.enunciado, 'alternativas', q.alternativas,
                'imagem', q.imagem, 'correta', g.correta, 'comentario', g.comentario, 'resposta', g.resposta) order by q.ordem)

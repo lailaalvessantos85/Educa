@@ -6,76 +6,66 @@ var Treino = (function () {
   var LETRAS = "ABCDE";
   var ENVIO_MS = 5000;
 
-  // ---------- API do YouTube (carregada só quando alguém abre um vídeo) ----------
-  var apiPronta = null;
-  function carregarAPI() {
-    if (apiPronta) return apiPronta;
-    apiPronta = new Promise(function (ok, falha) {
-      if (window.YT && window.YT.Player) return ok();
-      var antes = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = function () { if (antes) antes(); ok(); };
-      var s = document.createElement("script");
-      s.src = "https://www.youtube.com/iframe_api";
-      s.onerror = falha;
-      document.head.appendChild(s);
-      setTimeout(falha, 12000);
-    });
-    apiPronta.catch(function () { apiPronta = null; });
-    return apiPronta;
-  }
-
-  var player = null, timer = null, timerEnvio = null, atual = null;
+  var player = null, timerEnvio = null, timerPronto = null, atual = null;
   var $ = function (s) { return document.querySelector(s); };
 
   // prog: { fracao, liberado } já salvo no servidor; aoFechar recebe o progresso atualizado
   function abrir(v, prog, aoFechar) {
-    var id = ytId(v.youtube);
     atual = {
-      v: v, id: id, ultimo: null, novos: {}, enviando: false, aoFechar: aoFechar,
+      v: v, ultimo: null, novos: {}, enviando: false, aoFechar: aoFechar,
       fracao: prog ? prog.fracao : 0, liberado: !!(prog && prog.liberado),
       qs: null, respostas: {}, corrigido: false
     };
     $("#ptitle").textContent = v.titulo;
     $("#pmeta").textContent = [v.curso, "ENADE " + v.ano + (v.questao ? ", questão " + v.questao : ""), v.tema, v.professor].filter(Boolean).join(" · ");
     $("#pdesc").textContent = v.descricao || "";
-    $("#frame").innerHTML = '<div id="yt"></div>';
+    $("#frame").innerHTML = '<div class="carregando">Carregando vídeo…</div>';
     renderTreino();
     $("#player").showModal();
     $("#player").scrollTop = 0;
 
     var esta = atual;
-    carregarAPI().then(function () {
+    // O servidor confere a assinatura e devolve um link assinado que expira em poucas horas
+    Api.linkVideo(v.id).then(function (url) {
       if (atual !== esta) return;
-      player = new YT.Player("yt", {
-        host: "https://www.youtube-nocookie.com",
-        videoId: id,
-        playerVars: { autoplay: 1, rel: 0, playsinline: 1 },
-        events: { onStateChange: function (e) { if (e.data === 0) marcarFim(); } }
-      });
-      timer = setInterval(acompanhar, 1000);
-      timerEnvio = setInterval(enviar, ENVIO_MS);
-    }).catch(function () {
+      $("#frame").innerHTML = '<iframe src="' + esc(url) + '" title="' + esc(v.titulo) + '" loading="eager" ' +
+        'allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
+      conectarPlayer($("#frame iframe"), esta);
+    }).catch(function (e) {
       if (atual !== esta) return;
-      $("#frame").innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&rel=0" title="' + esc(v.titulo) +
-        '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
-      atual.semAPI = true;
-      renderTreino();
+      $("#frame").innerHTML = '<div class="carregando">' + esc(erroAmigavel(e)) + '</div>';
     });
   }
 
+  // Eventos do player do Bunny (biblioteca player.js): tempo atual e fim do vídeo
+  function conectarPlayer(iframe, esta) {
+    if (!window.playerjs) { semAcompanhamento(esta); return; }
+    player = new playerjs.Player(iframe);
+    timerPronto = setTimeout(function () { semAcompanhamento(esta); }, 20000);
+    player.on("ready", function () {
+      clearTimeout(timerPronto);
+      if (atual !== esta) return;
+      player.on("timeupdate", function (d) { if (atual === esta) tempo(d.seconds, d.duration); });
+      player.on("ended", function () { if (atual === esta) marcarFim(); });
+      timerEnvio = setInterval(enviar, ENVIO_MS);
+    });
+  }
+  function semAcompanhamento(esta) {
+    if (atual !== esta || atual.liberado) return;
+    atual.semAPI = true;
+    renderTreino();
+  }
+
   // Conta cada segundo realmente reproduzido. Saltos para frente (arrastar a barra) não contam.
-  function acompanhar() {
-    if (!player || !player.getPlayerState || !atual) return;
-    var t = player.getCurrentTime(), d = player.getDuration();
+  function tempo(t, d) {
     if (d > 0) atual.duracao = d;
-    if (player.getPlayerState() === 1 && atual.ultimo !== null && t > atual.ultimo && t - atual.ultimo <= 4.5) marcar(atual.ultimo, t);
-    atual.ultimo = player.getPlayerState() === 1 ? t : null;
+    if (atual.ultimo !== null && t > atual.ultimo && t - atual.ultimo <= 4.5) marcar(atual.ultimo, t);
+    atual.ultimo = t;
   }
   function marcar(de, ate) {
     for (var s = Math.floor(de); s < Math.floor(ate); s++) atual.novos[s] = 1;
   }
   function marcarFim() {
-    if (!atual) return;
     if (atual.ultimo !== null && atual.duracao && atual.duracao - atual.ultimo <= 4.5) marcar(atual.ultimo, atual.duracao);
     atual.ultimo = null;
     enviar();
@@ -103,10 +93,9 @@ var Treino = (function () {
   }
 
   async function fechar() {
-    clearInterval(timer); clearInterval(timerEnvio); timer = timerEnvio = null;
+    clearInterval(timerEnvio); clearTimeout(timerPronto); timerEnvio = timerPronto = null;
     var a = atual;
-    if (a) { acompanhar(); await enviar(); }
-    if (player && player.destroy) player.destroy();
+    if (a) await enviar();
     player = null; atual = null;
     $("#frame").innerHTML = "";
     if (a && a.aoFechar) a.aoFechar({ fracao: a.liberado ? 1 : a.fracao, liberado: a.liberado });
@@ -126,7 +115,7 @@ var Treino = (function () {
           '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>' +
           '<div><strong>As questões aparecem depois que você assistir à explicação.</strong>' +
           (atual.semAPI
-            ? '<p>Não foi possível acompanhar o vídeo neste navegador. Verifique se algum bloqueador está impedindo o YouTube e abra o vídeo de novo.</p>'
+            ? '<p>Não foi possível acompanhar o vídeo neste navegador. Verifique se algum bloqueador de conteúdo está ativo e abra o vídeo de novo.</p>'
             : '<p id="lockmsg"></p><div class="pbar"><i id="lockbar"></i></div>') +
           '</div></div>';
       atualizarBarra();

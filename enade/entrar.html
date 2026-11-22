@@ -45,6 +45,8 @@
       <div class="links"><button type="button" data-ir="entrar">Voltar para entrar</button></div>
     </form>
 
+    <div id="f-codigo" hidden></div>
+
     <form id="f-nova" novalidate hidden>
       <label class="campo">Nova senha <span class="hint">(mínimo de 8 caracteres)</span><input name="senha" type="password" autocomplete="new-password" minlength="8" required></label>
       <label class="campo">Repita a nova senha<input name="senha2" type="password" autocomplete="new-password" required></label>
@@ -67,14 +69,16 @@
     entrar: ["Entrar", "Acesse sua conta para assistir às explicações."],
     cadastro: ["Criar conta", "Crie sua conta grátis. Depois é só escolher um plano."],
     esqueci: ["Recuperar senha", "Sem problema, acontece."],
-    nova: ["Nova senha", "Escolha uma nova senha para sua conta."]
+    nova: ["Nova senha", "Escolha uma nova senha para sua conta."],
+    codigo: ["Verificação em duas etapas", "Falta só o código do seu aplicativo autenticador."]
   };
   var msg = document.getElementById("msg");
   function mostrar(texto, tipo) { msg.textContent = texto; msg.className = "msg " + (tipo || "erro"); msg.hidden = !texto; }
 
   function ir(aba) {
-    ["entrar", "cadastro", "esqueci", "nova"].forEach(function (a) { document.getElementById("f-" + a).hidden = a !== aba; });
-    document.getElementById("abas").hidden = aba === "esqueci" || aba === "nova";
+    ["entrar", "cadastro", "esqueci", "nova", "codigo"].forEach(function (a) { document.getElementById("f-" + a).hidden = a !== aba; });
+    document.getElementById("abas").hidden = aba === "esqueci" || aba === "nova" || aba === "codigo";
+    if (aba === "codigo") caixa2FA(document.getElementById("f-codigo"), "codigo", function () { location.href = volta; });
     document.querySelectorAll("[data-aba]").forEach(function (b) { b.setAttribute("aria-selected", b.dataset.aba === aba); });
     document.getElementById("titulo").textContent = TEXTOS[aba][0];
     document.getElementById("sub").textContent = TEXTOS[aba][1];
@@ -100,7 +104,12 @@
     ev.preventDefault(); var f = this;
     if (!emailOk(valor(f, "email"))) return mostrar("Digite um e-mail válido.");
     if (!f.elements.senha.value) return mostrar("Digite sua senha.");
-    enviar(f, async function () { await Api.entrar(valor(f, "email"), f.elements.senha.value); location.href = volta; });
+    enviar(f, async function () {
+      await Api.entrar(valor(f, "email"), f.elements.senha.value);
+      // Conta com verificação em duas etapas: pede o código antes de seguir
+      if ((await Api.estado(true)).precisaCodigo) ir("codigo");
+      else location.href = volta;
+    });
   });
 
   document.getElementById("f-cadastro").addEventListener("submit", function (ev) {
@@ -144,6 +153,7 @@
   Api.aoMudarSessao(function (ev) { if (ev === "PASSWORD_RECOVERY") ir("nova"); });
 
   if (p.get("modo") === "nova-senha") ir("nova");
+  else if (p.get("modo") === "codigo") ir("codigo");
   else ir(p.get("aba") === "cadastro" ? "cadastro" : "entrar");
   if (p.get("confirmado")) mostrar("E-mail confirmado! Agora é só entrar.", "ok");
 })();

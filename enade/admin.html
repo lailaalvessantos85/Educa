@@ -62,9 +62,9 @@
   <section class="secao-adm" id="sec-form" hidden>
     <div class="adm-top"><h2 id="ftitulo">Novo vídeo</h2></div>
     <form class="form" id="f" autocomplete="off">
-      <label class="full">Link do vídeo no YouTube
-        <input name="youtube" placeholder="https://www.youtube.com/watch?v=... (deixe vazio para mostrar como &quot;Em breve&quot;)">
-        <span class="hint" id="yhint">Use vídeo "não listado" no YouTube. Só assinantes recebem este link.</span>
+      <label class="full">Vídeo no Bunny Stream
+        <input name="video" placeholder="Cole o Video ID (ex.: 0a1b2c3d-...) ou o link do vídeo no painel do Bunny">
+        <span class="hint" id="yhint">No painel do Bunny: Stream > sua biblioteca > clique no vídeo > copie o "Video ID". Deixe vazio para mostrar como "Em breve".</span>
       </label>
       <label class="full">Título<input name="titulo" required placeholder="Ex.: Matriz SWOT aplicada ao estudo de caso"></label>
       <label>Curso<input name="curso" list="l-curso" required placeholder="Ex.: Administração"></label>
@@ -123,7 +123,14 @@
   var app = document.getElementById("app");
   var e = await Api.estado();
   if (!e.user) { location.href = "entrar.html?volta=admin.html"; return; }
-  if (!e.admin) { app.innerHTML = '<h1>Acesso restrito</h1><p class="lead">Esta página é só para administradores. <a href="index.html">Voltar</a></p>'; return; }
+  if (!e.perfilAdmin) { app.innerHTML = '<h1>Acesso restrito</h1><p class="lead">Esta página é só para administradores. <a href="index.html">Voltar</a></p>'; return; }
+  if (!e.admin) {
+    // Conta de admin, mas sem o código de duas etapas nesta sessão
+    var temFator = (await Api.mfa.fatores()).length > 0;
+    app.innerHTML = '<h1>Administração</h1><div class="caixa" style="max-width:560px" id="caixa2fa"></div>';
+    caixa2FA(document.getElementById("caixa2fa"), temFator ? "codigo" : "ativar", function () { location.reload(); });
+    return;
+  }
   app.innerHTML = document.getElementById("tpl").innerHTML;
 
   var $ = function (s) { return document.querySelector(s); };
@@ -163,7 +170,7 @@
     $("#ftitulo").textContent = v ? "Editar vídeo" : "Novo vídeo";
     if (v) {
       ["titulo", "curso", "ano", "questao", "tipo", "tema", "professor", "duracao", "capa", "descricao"].forEach(function (k) { f.elements[k].value = v[k] == null ? "" : v[k]; });
-      f.elements.youtube.value = v.youtube_id ? "https://youtu.be/" + v.youtube_id : "";
+      f.elements.video.value = v.bunny_id || "";
       ["publicado", "destaque", "gratuito"].forEach(function (k) { f.elements[k].checked = !!v[k]; });
       (v.questoes || []).forEach(function (q) { novaQuestao(q.tipo, q); });
     }
@@ -222,16 +229,16 @@
   qlist.addEventListener("click", function (ev) { if (ev.target.matches("[data-rm]")) ev.target.closest(".qb").remove(); });
 
   function dados() {
-    var d = { id: editando, youtube_id: ytId(f.elements.youtube.value) };
+    var d = { id: editando, bunny_id: bunnyId(f.elements.video.value) };
     ["titulo", "curso", "ano", "questao", "tipo", "tema", "professor", "duracao", "capa", "descricao"].forEach(function (k) { d[k] = f.elements[k].value.trim(); });
     ["publicado", "destaque", "gratuito"].forEach(function (k) { d[k] = f.elements[k].checked; });
     d.questoes = lerQuestoes();
     return d;
   }
   function atualizarPrevia() {
-    var raw = f.elements.youtube.value.trim(), d = dados();
-    $("#yhint").textContent = !raw ? 'Sem link: o vídeo aparece como "Em breve".' : ytId(raw) ? "Vídeo reconhecido: " + ytId(raw) : "Não reconheci esse link. Copie o endereço direto do vídeo no YouTube.";
-    $("#prev").innerHTML = cardHTML(Object.assign({}, d, { youtube: d.youtube_id, tem_video: !!d.youtube_id, n_questoes: d.questoes.length,
+    var raw = f.elements.video.value.trim(), d = dados();
+    $("#yhint").textContent = !raw ? 'Sem vídeo: aparece como "Em breve".' : d.bunny_id ? "Vídeo reconhecido: " + d.bunny_id : 'Não reconheci. Copie o "Video ID" do vídeo no painel do Bunny (formato 0a1b2c3d-0000-...).';
+    $("#prev").innerHTML = cardHTML(Object.assign({}, d, { bunny: d.bunny_id, tem_video: !!d.bunny_id, n_questoes: d.questoes.length,
       titulo: d.titulo || "Título do vídeo", curso: d.curso || "Curso", ano: d.ano || "2024" }), 0, 0);
   }
   f.addEventListener("input", atualizarPrevia);
@@ -241,7 +248,7 @@
   $("#salvar").addEventListener("click", async function () {
     var d = dados();
     if (!d.titulo || !d.curso) { aviso("Preencha pelo menos o título e o curso.", "erro"); return; }
-    if (f.elements.youtube.value.trim() && !d.youtube_id) { aviso("O link do YouTube não foi reconhecido.", "erro"); return; }
+    if (f.elements.video.value.trim() && !d.bunny_id) { aviso("O ID do vídeo no Bunny não foi reconhecido.", "erro"); return; }
     var semCerta = d.questoes.some(function (q) { return q.tipo === "objetiva" && q.alternativas.filter(Boolean).length < 2; });
     if (semCerta) { aviso("Cada questão objetiva precisa de pelo menos 2 alternativas.", "erro"); return; }
     var b = this; b.disabled = true; b.textContent = "Salvando…";

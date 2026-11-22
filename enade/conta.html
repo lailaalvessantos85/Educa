@@ -32,6 +32,11 @@
     </form>
   </section>
 
+  <section class="caixa secao" id="seg" hidden>
+    <h2>Verificação em duas etapas</h2>
+    <div id="seg2fa"></div>
+  </section>
+
   <section class="caixa secao perigo">
     <h2>Excluir conta</h2>
     <p class="hint" style="font-size:14.5px">Apaga sua conta, seu progresso e suas respostas. Isso não pode ser desfeito.
@@ -67,7 +72,10 @@
 
   function renderAssinatura() {
     var a = e.assinatura, box = document.getElementById("assinatura");
-    if (e.admin) { box.innerHTML = '<div class="linha"><span class="rot">Situação</span><span class="status ativa">Administradora (acesso total)</span></div>'; return; }
+    if (e.perfilAdmin) {
+      box.innerHTML = '<div class="linha"><span class="rot">Situação</span><span class="status ' + (e.admin ? 'ativa">Administradora (acesso total)' : 'pendente">Administradora: falta o código de duas etapas') + '</span></div>';
+      return;
+    }
     if (!a) {
       box.innerHTML = '<div class="linha"><span class="rot">Situação</span><span class="status nenhuma">Sem assinatura</span></div>' +
         '<p style="margin:14px 0 0"><a class="btn prim" href="planos.html">Ver planos</a></p>';
@@ -103,6 +111,14 @@
     }
     if (e.acesso) document.getElementById("retorno").innerHTML = '<div class="msg ok">Pagamento confirmado! <a href="index.html">Começar a assistir</a></div>';
     history.replaceState(null, "", "conta.html");
+  }
+
+  // Segurança: obrigatória para administradores
+  if (e.perfilAdmin) {
+    document.getElementById("seg").hidden = false;
+    var box2 = document.getElementById("seg2fa");
+    if (e.admin) box2.innerHTML = '<div class="linha"><span class="rot">Situação</span><span class="status ativa">Ativa</span></div><p class="hint">Ao entrar, sempre será pedido o código do aplicativo autenticador.</p>';
+    else caixa2FA(box2, (await Api.mfa.fatores()).length ? "codigo" : "ativar", function () { location.reload(); });
   }
 
   var f = document.getElementById("fnome");
