@@ -19,6 +19,25 @@
     descricao  – uma ou duas frases sobre a questão (opcional)
     destaque   – true para aparecer no banner grande do topo (opcional).
                  Se nenhum vídeo tiver destaque, o banner mostra o último adicionado.
+    questoes   – questões de treino que aparecem abaixo do vídeo (opcional).
+                 Só ficam visíveis depois que o aluno assiste a 90% do vídeo.
+
+  Formato das questões de treino:
+    questoes: [
+      {                                   // questão objetiva
+        enunciado: "Texto da questão",
+        alternativas: ["texto A", "texto B", "texto C", "texto D", "texto E"],
+        correta: "C",                     // letra da alternativa certa
+        comentario: "Por que a C está certa (aparece no gabarito)"   // opcional
+      },
+      {                                   // questão discursiva
+        tipo: "discursiva",
+        enunciado: "Texto da questão",
+        resposta: "Padrão de resposta (aparece no gabarito)"
+      }
+    ]
+  Para pular linha dentro de um texto, use \n. Para incluir uma figura,
+  acrescente imagem: "link da imagem" na questão.
 
   Os exemplos abaixo estão sem link (youtube: "") e aparecem como
   "Vídeo em breve". Apague-os ou substitua pelos seus vídeos.
@@ -58,7 +77,38 @@ window.VIDEOS = [
     tema: "Marketing",
     professor: "Profa. Laila",
     duracao: "8:30",
-    descricao: "Os conceitos de jornada do consumidor cobrados na questão, um por um."
+    descricao: "Os conceitos de jornada do consumidor cobrados na questão, um por um.",
+    questoes: [
+      {
+        enunciado: "Uma loja de roupas percebeu que muitos clientes pesquisam os produtos no Instagram, comparam preços em sites e só depois vão à loja física para comprar.\n\nEsse comportamento é melhor descrito pelo conceito de",
+        alternativas: [
+          "marketing de massa, pois a comunicação é a mesma para todos os clientes.",
+          "jornada omnichannel, pois o consumidor transita entre canais on-line e off-line na mesma compra.",
+          "marketing de guerrilha, pois a empresa usa ações de baixo custo e alto impacto.",
+          "obsolescência programada, pois os produtos são trocados com frequência.",
+          "venda pessoal, pois a decisão de compra acontece só com o vendedor."
+        ],
+        correta: "B",
+        comentario: "O cliente usa vários canais (rede social, sites, loja) em etapas diferentes de uma mesma compra. Integrar esses canais é a ideia central do omnichannel."
+      },
+      {
+        enunciado: "Na etapa de consideração da jornada do consumidor, a ação de marketing mais adequada é",
+        alternativas: [
+          "anunciar a marca para pessoas que ainda não sabem que têm o problema.",
+          "oferecer conteúdos comparativos, avaliações de clientes e demonstrações do produto.",
+          "enviar pesquisa de satisfação após a entrega.",
+          "criar um programa de fidelidade para quem já comprou várias vezes.",
+          "reduzir o preço de todos os produtos da loja."
+        ],
+        correta: "B",
+        comentario: "Na consideração, o cliente já conhece o problema e compara soluções. Conteúdos que ajudam a comparar e geram confiança são os mais úteis nessa fase."
+      },
+      {
+        tipo: "discursiva",
+        enunciado: "Explique, em até 5 linhas, por que conhecer a jornada do consumidor ajuda uma empresa a investir melhor em marketing digital.",
+        resposta: "Espera-se que o estudante mencione que cada etapa (descoberta, consideração, decisão e pós-compra) pede mensagens e canais diferentes. Conhecer a jornada permite direcionar o investimento para o canal e o conteúdo certos em cada etapa, evitando gastar com ações que não convertem e melhorando a experiência do cliente."
+      }
+    ]
   },
   {
     titulo: "Requisitos funcionais e não funcionais",
@@ -70,7 +120,33 @@ window.VIDEOS = [
     tema: "Engenharia de Requisitos",
     professor: "Profa. Laila",
     duracao: "6:10",
-    descricao: "Como diferenciar os dois tipos de requisito no enunciado da questão."
+    descricao: "Como diferenciar os dois tipos de requisito no enunciado da questão.",
+    questoes: [
+      {
+        enunciado: "Em um sistema de matrícula on-line, qual item abaixo é um requisito NÃO funcional?",
+        alternativas: [
+          "O aluno deve poder escolher as disciplinas do semestre.",
+          "O sistema deve emitir o comprovante de matrícula em PDF.",
+          "A página de matrícula deve carregar em até 2 segundos com 5.000 usuários simultâneos.",
+          "O coordenador deve poder aprovar ou recusar pedidos de quebra de pré-requisito.",
+          "O aluno deve receber um e-mail quando a matrícula for confirmada."
+        ],
+        correta: "C",
+        comentario: "Tempo de resposta sob carga é uma qualidade do sistema (desempenho), não uma função que o usuário executa. As demais alternativas descrevem o que o sistema faz."
+      },
+      {
+        enunciado: "Considere o requisito: \"O sistema deve permitir que o usuário redefina a senha pelo e-mail cadastrado, e o link enviado deve expirar em 30 minutos.\"\n\nÉ correto afirmar que esse requisito",
+        alternativas: [
+          "é apenas funcional.",
+          "é apenas não funcional.",
+          "mistura um requisito funcional (redefinir senha) e um não funcional (expiração do link, ligada à segurança).",
+          "não é um requisito, e sim uma regra de negócio sem relação com o software.",
+          "deve ser descartado, pois requisitos não podem citar tempo."
+        ],
+        correta: "C",
+        comentario: "Redefinir a senha é uma função. A expiração em 30 minutos é uma restrição de segurança. Uma boa prática é separar os dois em requisitos distintos."
+      }
+    ]
   },
   {
     titulo: "Metodologias ágeis: papéis no Scrum",

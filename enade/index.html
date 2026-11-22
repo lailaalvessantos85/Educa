@@ -82,6 +82,7 @@
       <div><h2 id="ptitle"></h2><p id="pmeta"></p><p id="pdesc"></p></div>
       <button class="close" type="button" id="pclose">Fechar</button>
     </div>
+    <section class="treino" id="treino" hidden></section>
   </div>
 </dialog>
 
@@ -89,6 +90,7 @@
 
 <script src="videos.js"></script>
 <script src="comum.js"></script>
+<script src="treino.js"></script>
 <script>
 (function () {
   var VIDEOS = (window.VIDEOS || []).map(function (v, i) { v._i = i; return v; });
@@ -101,11 +103,8 @@
   var selects = {};
   document.querySelectorAll("select[data-f]").forEach(function (s) { selects[s.dataset.f] = s; });
 
-  // Vídeos já assistidos ficam marcados com uma barrinha (salvo só neste navegador).
-  var vistos = {};
-  try { vistos = JSON.parse(localStorage.getItem("enade-vistos") || "{}") || {}; } catch (e) {}
-  function marcarVisto(id) { vistos[id] = 1; try { localStorage.setItem("enade-vistos", JSON.stringify(vistos)); } catch (e) {} }
-  function card(v) { return cardHTML(v, v._i, !!vistos[ytId(v.youtube)]); }
+  // A barrinha embaixo da miniatura mostra quanto do vídeo o aluno já assistiu (salvo só neste navegador).
+  function card(v) { return cardHTML(v, v._i, Treino.fracao(ytId(v.youtube))); }
 
   function norm(s) { return String(s == null ? "" : s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
   VIDEOS.forEach(function (v) {
@@ -299,19 +298,20 @@
     if (c) { estado.curso = c.dataset.curso; render(); window.scrollTo(0, 0); return; }
     var b = e.target.closest("[data-play]");
     if (!b) return;
-    var v = VIDEOS[+b.dataset.play], id = ytId(v.youtube);
-    $("#frame").innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + id +
-      '?autoplay=1&rel=0" title="' + esc(v.titulo) + '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
-    $("#ptitle").textContent = v.titulo;
-    $("#pmeta").textContent = [v.curso, "ENADE " + v.ano + (v.questao ? ", questão " + v.questao : ""), v.tema, v.professor].filter(Boolean).join(" · ");
-    $("#pdesc").textContent = v.descricao || "";
-    dlg.showModal();
-    marcarVisto(id);
-    b.closest(".card") && b.closest(".card").classList.add("watched");
+    var v = VIDEOS[+b.dataset.play];
+    Treino.abrir(v, function () { atualizarCards(v); });
   });
+  // Ao fechar o vídeo, a barrinha de progresso dos cards desse vídeo é atualizada.
+  function atualizarCards(v) {
+    document.querySelectorAll('.thumb[data-play="' + v._i + '"]').forEach(function (t) {
+      var novo = document.createElement("div");
+      novo.innerHTML = card(v);
+      t.closest(".card").replaceWith(novo.firstChild);
+    });
+  }
   $("#pclose").addEventListener("click", function () { dlg.close(); });
   dlg.addEventListener("click", function (e) { if (e.target === dlg) dlg.close(); });
-  dlg.addEventListener("close", function () { $("#frame").innerHTML = ""; });
+  dlg.addEventListener("close", function () { Treino.fechar(); });
 
   lerURL();
   renderHero();

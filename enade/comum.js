@@ -17,7 +17,7 @@ function esc(s) {
 
 var PLAY_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>';
 
-function cardHTML(v, i, assistido) {
+function cardHTML(v, i, progresso) {
   var id = ytId(v.youtube);
   var fg = v.tipo === "Formação Geral";
   var badge = v.tipo ? '<span class="badge ' + (fg ? "fg" : "ce") + '" title="' + esc(v.tipo) + '">' + (fg ? "FORMAÇÃO GERAL" : "ESPECÍFICA") + '</span>' : "";
@@ -26,11 +26,13 @@ function cardHTML(v, i, assistido) {
     ? '<button class="thumb" type="button" data-play="' + i + '" aria-label="Assistir: ' + esc(v.titulo) + '">' +
         '<img loading="lazy" src="https://i.ytimg.com/vi/' + id + '/hqdefault.jpg" alt="">' +
         badge + q + (v.duracao ? '<span class="dur">' + esc(v.duracao) + '</span>' : '') +
+        (progresso > 0 ? '<span class="prog" aria-label="Assistido ' + Math.round(progresso * 100) + '%"><i style="width:' + Math.round(progresso * 100) + '%"></i></span>' : '') +
         '<span class="playic"><span style="color:#1A1413">' + PLAY_ICON + '</span></span>' +
       '</button>'
     : '<div class="thumb soon">' + badge + q + '<span class="soonlbl">Em breve</span></div>';
-  return '<article class="card' + (assistido ? " watched" : "") + '">' + thumb +
+  var nq = (v.questoes || []).length;
+  return '<article class="card">' + thumb +
     '<div class="info"><h3>' + esc(v.titulo) + '</h3>' +
     '<p class="sub"><span class="tema">' + esc(v.tema) + '</span>' + (v.professor ? ' · ' + esc(v.professor) : '') + '</p>' +
-    '<p class="sub">' + esc(v.curso) + '</p></div></article>';
+    '<p class="sub">' + esc(v.curso) + (nq ? ' · <span class="ex">' + nq + (nq === 1 ? ' exercício' : ' exercícios') + '</span>' : '') + '</p></div></article>';
 }

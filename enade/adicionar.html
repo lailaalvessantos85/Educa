@@ -32,6 +32,19 @@
     <label class="full">Descrição (opcional)<textarea name="descricao" placeholder="Uma ou duas frases sobre o que o vídeo explica."></textarea></label>
     <datalist id="l-curso"></datalist><datalist id="l-tema"></datalist><datalist id="l-professor"></datalist>
   </form>
+
+  <section class="qbuilder">
+    <div class="qbhead">
+      <div><h2>Questões de treino <span class="hint">(opcional)</span></h2>
+      <p class="hint">Aparecem abaixo do vídeo depois que o aluno assiste a 90% dele. O gabarito é mostrado no fim.</p></div>
+      <div class="qbbtns">
+        <button class="btn sec" type="button" data-add="objetiva">+ Questão objetiva</button>
+        <button class="btn sec" type="button" data-add="discursiva">+ Questão discursiva</button>
+      </div>
+    </div>
+    <div id="qlist"></div>
+  </section>
+
   <div class="out">
     <div><h2>Prévia</h2><div id="prev"></div></div>
     <div>
@@ -44,6 +57,24 @@
 </div>
 <script src="videos.js"></script>
 <script src="comum.js"></script>
+<style>
+.qbuilder{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:20px;margin:0 0 26px}
+.qbhead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px 20px}
+.qbhead h2{font-size:18px}
+.qbhead p{margin:4px 0 0}
+.qbbtns{display:flex;flex-wrap:wrap;gap:8px}
+.qbbtns .btn{font-size:14px;padding:8px 14px}
+.qb{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:14px;display:flex;flex-direction:column;gap:10px}
+.qbtop{display:flex;justify-content:space-between;align-items:center}
+.qb label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:14px}
+.qb textarea,.qb input:not([type=radio]){font:inherit;font-weight:400;color:var(--ink);background:var(--bg2);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%}
+.qb textarea{min-height:70px;resize:vertical}
+.qb fieldset{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
+.qb legend{font-weight:600;font-size:14px;margin-bottom:4px;padding:0}
+.altrow{display:flex;align-items:center;gap:8px}
+.altrow input[type=radio]{width:18px;height:18px;accent-color:#7FD99A;flex:none}
+.altrow .L{flex:none;width:20px;font-weight:700;color:var(--muted)}
+</style>
 <script>
 (function () {
   var f = document.getElementById("f");
@@ -60,6 +91,8 @@
       d[k] = f.elements[k].value.trim();
     });
     if (f.elements.destaque.checked) d.destaque = true;
+    var qs = lerQuestoes();
+    if (qs.length) d.questoes = qs;
     var id = ytId(d.youtube);
     if (id) d.youtube = "https://youtu.be/" + id;
     return d;
@@ -68,10 +101,65 @@
     var linhas = Object.keys(d).map(function (k) {
       var v = d[k];
       var num = (k === "ano" || k === "questao") && /^\d+$/.test(v);
+      if (k === "questoes") return "    questoes: " + blocoQuestoes(v);
       return "    " + k + ": " + (num || typeof v === "boolean" ? v : JSON.stringify(v));
     });
     return "  {\n" + linhas.join(",\n") + "\n  },";
   }
+  // ---------- Montador de questões ----------
+  var LETRAS = "ABCDE", qlist = document.getElementById("qlist"), nq = 0;
+  function novaQuestao(tipo) {
+    var n = ++nq, el = document.createElement("div");
+    el.className = "qb"; el.dataset.tipo = tipo;
+    var html = '<div class="qbtop"><strong>' + (tipo === "discursiva" ? "Questão discursiva" : "Questão objetiva") + '</strong>' +
+      '<button class="linkbtn" type="button" data-rm>Remover</button></div>' +
+      '<label>Enunciado<textarea data-k="enunciado" placeholder="Texto da questão. Pode ter várias linhas."></textarea></label>';
+    if (tipo === "discursiva") {
+      html += '<label>Padrão de resposta (aparece no gabarito)<textarea data-k="resposta"></textarea></label>';
+    } else {
+      html += '<fieldset><legend>Alternativas <span class="hint">(marque a correta)</span></legend>';
+      for (var i = 0; i < 5; i++) {
+        html += '<div class="altrow"><input type="radio" name="c' + n + '" value="' + LETRAS[i] + '" aria-label="Alternativa ' + LETRAS[i] + ' é a correta"' + (i === 0 ? " checked" : "") + '>' +
+          '<span class="L">' + LETRAS[i] + '</span><input data-alt="' + i + '" placeholder="Texto da alternativa ' + LETRAS[i] + '"></div>';
+      }
+      html += '</fieldset><label>Comentário do gabarito (opcional)<textarea data-k="comentario" placeholder="Por que essa alternativa está certa?"></textarea></label>';
+    }
+    html += '<label>Link de imagem (opcional)<input data-k="imagem" placeholder="https://..."></label>';
+    el.innerHTML = html;
+    qlist.appendChild(el);
+    el.querySelector("textarea").focus();
+    atualizar();
+  }
+  function lerQuestoes() {
+    return Array.prototype.map.call(qlist.children, function (el) {
+      var q = {}, val = function (k) { var x = el.querySelector('[data-k="' + k + '"]'); return x ? x.value.trim() : ""; };
+      if (el.dataset.tipo === "discursiva") q.tipo = "discursiva";
+      q.enunciado = val("enunciado");
+      if (q.tipo) q.resposta = val("resposta");
+      else {
+        var alts = Array.prototype.map.call(el.querySelectorAll("[data-alt]"), function (i) { return i.value.trim(); });
+        while (alts.length > 2 && !alts[alts.length - 1]) alts.pop();
+        q.alternativas = alts;
+        q.correta = el.querySelector("input[type=radio]:checked").value;
+        if (val("comentario")) q.comentario = val("comentario");
+      }
+      if (val("imagem")) q.imagem = val("imagem");
+      return q;
+    }).filter(function (q) { return q.enunciado; });
+  }
+  function blocoQuestoes(qs) {
+    return "[\n" + qs.map(function (q) {
+      return "      {\n" + Object.keys(q).map(function (k) {
+        if (k === "alternativas") return "        alternativas: [\n" + q[k].map(function (a) { return "          " + JSON.stringify(a); }).join(",\n") + "\n        ]";
+        return "        " + k + ": " + JSON.stringify(q[k]);
+      }).join(",\n") + "\n      }";
+    }).join(",\n") + "\n    ]";
+  }
+  document.querySelectorAll("[data-add]").forEach(function (b) { b.addEventListener("click", function () { novaQuestao(b.dataset.add); }); });
+  qlist.addEventListener("click", function (e) { if (e.target.matches("[data-rm]")) { e.target.closest(".qb").remove(); atualizar(); } });
+  qlist.addEventListener("input", function () { atualizar(); });
+  qlist.addEventListener("change", function () { atualizar(); });
+
   function atualizar() {
     var d = dados();
     var raw = f.elements.youtube.value.trim();
