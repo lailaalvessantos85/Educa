@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ENADE Explicado</title>
+<meta name="description" content="Vídeos curtos em que professores explicam questões do ENADE, com filtros por curso, ano, tema e professor.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Work+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<header class="top wrap">
+  <div class="ribbon" aria-hidden="true"><i style="background:#352D2C"></i><i style="background:#5B413E"></i><i style="background:#AE4B3D"></i><i style="background:#C79A93"></i><i style="background:#EE9D90"></i><i style="background:#FB7D6A"></i><i style="background:#FE5C45"></i></div>
+  <h1>ENADE Explicado</h1>
+  <p>Vídeos curtos em que professores resolvem questões do ENADE passo a passo. Filtre por curso, ano, tema ou professor e assista aqui mesmo.</p>
+</header>
+
+<div class="filters">
+  <div class="wrap">
+    <div class="search">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <label class="sr" for="q">Buscar</label>
+      <input id="q" type="search" placeholder="Buscar por assunto, título ou palavra-chave" autocomplete="off">
+    </div>
+    <div class="row">
+      <label>Curso<select data-f="curso"></select></label>
+      <label>Ano<select data-f="ano"></select></label>
+      <label>Tipo de questão<select data-f="tipo"></select></label>
+      <label>Tema<select data-f="tema"></select></label>
+      <label>Professor<select data-f="professor"></select></label>
+    </div>
+    <div class="meta">
+      <span class="count" id="count" aria-live="polite"></span>
+      <div class="chips" id="chips"></div>
+      <button class="linkbtn" id="clear" type="button" hidden>Limpar filtros</button>
+      <label class="sort">Ordenar
+        <select id="sort">
+          <option value="recente">Prova mais recente</option>
+          <option value="antiga">Prova mais antiga</option>
+          <option value="questao">Número da questão</option>
+          <option value="titulo">Título (A–Z)</option>
+        </select>
+      </label>
+    </div>
+  </div>
+</div>
+
+<main class="wrap">
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" hidden>
+    <h2>Nenhum vídeo encontrado</h2>
+    <p>Tente outra palavra na busca ou <button class="linkbtn" type="button" data-clear>limpe os filtros</button>.</p>
+  </div>
+</main>
+
+<dialog id="player" aria-labelledby="ptitle">
+  <div class="player">
+    <div class="frame" id="frame"></div>
+    <div class="info">
+      <div><h2 id="ptitle"></h2><p id="pmeta"></p></div>
+      <button class="close" type="button" id="pclose">Fechar</button>
+    </div>
+  </div>
+</dialog>
+
+<footer class="wrap">Questões do Exame Nacional de Desempenho dos Estudantes (ENADE/INEP). Vídeos hospedados no YouTube.</footer>
+
+<script src="videos.js"></script>
+<script src="comum.js"></script>
+<script>
+(function () {
+  var VIDEOS = (window.VIDEOS || []).map(function (v, i) { v._i = i; return v; });
+  var FILTROS = ["curso", "ano", "tipo", "tema", "professor"];
+  var NOMES = { curso: "Curso", ano: "Ano", tipo: "Tipo", tema: "Tema", professor: "Professor" };
+  var estado = { q: "", sort: "recente" };
+  FILTROS.forEach(function (f) { estado[f] = ""; });
+
+  var $ = function (s) { return document.querySelector(s); };
+  var selects = {};
+  document.querySelectorAll("select[data-f]").forEach(function (s) { selects[s.dataset.f] = s; });
+
+  // Busca sem diferenciar acentos e maiúsculas.
+  function norm(s) { return String(s == null ? "" : s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
+  VIDEOS.forEach(function (v) {
+    v._txt = norm([v.titulo, v.descricao, v.tema, v.curso, v.professor, v.tipo, v.ano, "questao " + v.questao].join(" "));
+  });
+
+  function passa(v, ignorar) {
+    for (var k = 0; k < FILTROS.length; k++) {
+      var f = FILTROS[k];
+      if (f !== ignorar && estado[f] && String(v[f]) !== estado[f]) return false;
+    }
+    if (estado.q) {
+      var termos = norm(estado.q).split(/\s+/).filter(Boolean);
+      for (var t = 0; t < termos.length; t++) if (v._txt.indexOf(termos[t]) < 0) return false;
+    }
+    return true;
+  }
+
+  // Cada lista mostra só opções que ainda trazem resultado, com a contagem.
+  function montarOpcoes() {
+    FILTROS.forEach(function (f) {
+      var cont = {};
+      VIDEOS.forEach(function (v) {
+        if (v[f] === undefined || v[f] === "") return;
+        if (passa(v, f)) cont[v[f]] = (cont[v[f]] || 0) + 1;
+      });
+      if (estado[f] && !cont[estado[f]]) cont[estado[f]] = 0;
+      var chaves = Object.keys(cont).sort(function (a, b) {
+        return f === "ano" ? b - a : a.localeCompare(b, "pt-BR");
+      });
+      var html = '<option value="">Todos</option>';
+      chaves.forEach(function (c) {
+        html += '<option value="' + esc(c) + '"' + (c === estado[f] ? " selected" : "") + '>' + esc(c) + ' (' + cont[c] + ')</option>';
+      });
+      selects[f].innerHTML = html;
+    });
+  }
+
+  function ordenar(lista) {
+    var s = estado.sort;
+    return lista.sort(function (a, b) {
+      if (s === "titulo") return String(a.titulo).localeCompare(b.titulo, "pt-BR");
+      if (s === "questao") return (a.questao || 0) - (b.questao || 0) || (b.ano || 0) - (a.ano || 0);
+      var d = (a.ano || 0) - (b.ano || 0);
+      return (s === "antiga" ? d : -d) || (a.questao || 0) - (b.questao || 0);
+    });
+  }
+
+  function render() {
+    montarOpcoes();
+    var lista = ordenar(VIDEOS.filter(function (v) { return passa(v); }));
+    $("#grid").innerHTML = lista.map(function (v) { return cardHTML(v, v._i); }).join("");
+    $("#empty").hidden = lista.length > 0;
+    $("#count").textContent = lista.length + (lista.length === 1 ? " vídeo" : " vídeos");
+
+    var ativos = FILTROS.filter(function (f) { return estado[f]; });
+    $("#chips").innerHTML = ativos.map(function (f) {
+      return '<button class="chip" type="button" data-rm="' + f + '" aria-label="Remover filtro ' + NOMES[f] + '">' +
+        NOMES[f] + ': <b>' + esc(estado[f]) + '</b> ×</button>';
+    }).join("");
+    $("#clear").hidden = !ativos.length && !estado.q;
+    salvarURL();
+  }
+
+  // Os filtros ficam no endereço da página: dá para mandar o link já filtrado para os alunos.
+  function salvarURL() {
+    var p = new URLSearchParams();
+    FILTROS.concat("q").forEach(function (f) { if (estado[f]) p.set(f, estado[f]); });
+    if (estado.sort !== "recente") p.set("ordem", estado.sort);
+    var qs = p.toString();
+    try { history.replaceState(null, "", qs ? "?" + qs : location.pathname); } catch (e) {}
+  }
+  function lerURL() {
+    var p = new URLSearchParams(location.search);
+    FILTROS.concat("q").forEach(function (f) { if (p.get(f)) estado[f] = p.get(f); });
+    if (p.get("ordem")) estado.sort = p.get("ordem");
+    $("#q").value = estado.q;
+    $("#sort").value = estado.sort;
+  }
+
+  function limpar() {
+    FILTROS.forEach(function (f) { estado[f] = ""; });
+    estado.q = ""; $("#q").value = "";
+    render();
+  }
+
+  FILTROS.forEach(function (f) {
+    selects[f].addEventListener("change", function () { estado[f] = this.value; render(); });
+  });
+  var timer;
+  $("#q").addEventListener("input", function () {
+    var val = this.value;
+    clearTimeout(timer);
+    timer = setTimeout(function () { estado.q = val.trim(); render(); }, 150);
+  });
+  $("#sort").addEventListener("change", function () { estado.sort = this.value; render(); });
+  $("#clear").addEventListener("click", limpar);
+  document.querySelector("[data-clear]").addEventListener("click", limpar);
+  $("#chips").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-rm]");
+    if (b) { estado[b.dataset.rm] = ""; render(); }
+  });
+
+  // Player
+  var dlg = $("#player");
+  $("#grid").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-play]");
+    if (!b) return;
+    var v = VIDEOS[+b.dataset.play];
+    $("#frame").innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + ytId(v.youtube) +
+      '?autoplay=1&rel=0" title="' + esc(v.titulo) + '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
+    $("#ptitle").textContent = v.titulo;
+    $("#pmeta").textContent = [v.curso, "ENADE " + v.ano + (v.questao ? ", questão " + v.questao : ""), v.professor].join(" · ");
+    dlg.showModal();
+  });
+  $("#pclose").addEventListener("click", function () { dlg.close(); });
+  dlg.addEventListener("click", function (e) { if (e.target === dlg) dlg.close(); });
+  dlg.addEventListener("close", function () { $("#frame").innerHTML = ""; });
+
+  lerURL();
+  render();
+})();
+</script>
+</body>
+</html>
