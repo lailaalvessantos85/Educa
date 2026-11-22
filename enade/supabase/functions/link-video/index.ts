@@ -23,6 +23,10 @@ Deno.serve(async (req) => {
     if (error) throw error;
     if (!data) throw new ErroHttp(403, "Este vídeo é para assinantes.");
 
+    // Histórico de acessos (guardado por 2 anos). Uma falha aqui não impede o aluno de assistir.
+    const reg = await sb.rpc("registrar_acesso", { p_tipo: "video", p_video: video_id });
+    if (reg.error) console.error("registrar_acesso", reg.error);
+
     return json(await linkAssinado({
       biblioteca: env("BUNNY_LIBRARY_ID"),
       videoId: data.bunny_id,

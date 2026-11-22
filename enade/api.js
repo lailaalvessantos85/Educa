@@ -43,6 +43,8 @@ var Api = (function () {
     exigir();
     falhou(await sb.auth.signInWithPassword({ email: email, password: senha }));
     cache = null;
+    // histórico de acessos (guardado por 2 anos); se falhar, não impede o login
+    try { await sb.rpc("registrar_acesso", { p_tipo: "login" }); } catch (e) { console.error(e); }
   }
   async function cadastrar(nome, email, senha) {
     exigir();
@@ -162,6 +164,13 @@ var Api = (function () {
     }
   };
 
+  // Pagamentos da própria conta (histórico)
+  async function meusPagamentos() {
+    var e = await estado();
+    if (!e.user) return [];
+    return falhou(await sb.from("pagamentos").select("data, valor, status, plano_id").eq("user_id", e.user.id).order("data", { ascending: false }));
+  }
+
   // ---------- Conta ----------
   async function salvarNome(nome) {
     var e = await estado();
@@ -185,14 +194,21 @@ var Api = (function () {
     salvar: async function (dados) { return falhou(await sb.rpc("admin_salvar_video", { p: dados })); },
     excluir: async function (id) { falhou(await sb.from("videos").delete().eq("id", id)); },
     planos: async function () { return falhou(await sb.from("planos").select("*").order("ordem")); },
-    salvarPlano: async function (p) { falhou(await sb.from("planos").upsert(p)); }
+    salvarPlano: async function (p) { falhou(await sb.from("planos").upsert(p)); },
+    relatorio: async function () { return falhou(await sb.rpc("admin_relatorio")); },
+    aluno: async function (email) { return falhou(await sb.rpc("admin_aluno", { p_email: email })); },
+    // pagamentos de um período (para o contador)
+    pagamentosPeriodo: async function (inicio, fim) {
+      return falhou(await sb.from("pagamentos").select("data, valor, status, status_mp, plano_id, mp_id, user_id")
+        .gte("data", inicio).lt("data", fim).order("data", { ascending: true }));
+    }
   };
 
   return {
     configurado: configurado, estado: estado, entrar: entrar, cadastrar: cadastrar, recuperar: recuperar,
     novaSenha: novaSenha, sair: sair, aoMudarSessao: aoMudarSessao, catalogo: catalogo, conteudos: conteudos,
     progressos: progressos, linkVideo: linkVideo, mfa: mfa, registrarProgresso: registrarProgresso, questoes: questoes, corrigir: corrigir,
-    planos: planos, assinar: assinar, cancelar: cancelar, salvarNome: salvarNome, excluirConta: excluirConta, admin: admin
+    planos: planos, assinar: assinar, meusPagamentos: meusPagamentos, cancelar: cancelar, salvarNome: salvarNome, excluirConta: excluirConta, admin: admin
   };
 })();
 

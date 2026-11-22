@@ -8,6 +8,11 @@ export type Assinatura = {
 };
 export type Preapproval = {
   id: string; status: string; external_reference?: string; next_payment_date?: string; init_point?: string;
+  auto_recurring?: { transaction_amount?: number };
+};
+export type Pagamento = {
+  mp_id: string; assinatura_id: string | null; user_id: string | null; plano_id: string | null;
+  valor: number | null; status: string; status_mp: string; data: string | null; dados_mp: unknown;
 };
 
 // O que as funções precisam do banco (implementado com supabase-js em db.ts).
@@ -18,6 +23,7 @@ export interface Banco {
   porPreapproval(mpId: string): Promise<Assinatura | null>;
   inserir(a: Partial<Assinatura>): Promise<void>;
   atualizar(id: string, dados: Partial<Assinatura>): Promise<void>;
+  registrarPagamento(p: Pagamento): Promise<void>; // cria ou atualiza pelo mp_id
 }
 
 export class ErroHttp extends Error {
@@ -122,6 +128,20 @@ export async function cancelarAssinatura(userId: string, mp: MP, db: Banco) {
   return { acesso_ate: a.acesso_ate, status: pre.status };
 }
 
+// Situação de uma cobrança. Lê primeiro o pagamento gerado (payment.status) e, se não houver,
+// a situação da cobrança agendada. O texto original fica guardado em status_mp e o aviso completo em dados_mp.
+export function statusPagamento(pag: Record<string, any>): string {
+  const p = String(pag?.payment?.status ?? "").toLowerCase();
+  const porPagamento: Record<string, string> = {
+    approved: "aprovado", authorized: "pendente", pending: "pendente", in_process: "pendente", in_mediation: "pendente",
+    rejected: "recusado", cancelled: "cancelado", refunded: "estornado", charged_back: "estornado",
+  };
+  if (porPagamento[p]) return porPagamento[p];
+  const c = String(pag?.status ?? "").toLowerCase();
+  const porCobranca: Record<string, string> = { scheduled: "agendado", recycling: "recusado", cancelled: "cancelado" };
+  return porCobranca[c] ?? "outro";
+}
+
 // Avisos do Mercado Pago. Nunca confiamos no conteúdo do aviso: buscamos o dado na API.
 export async function processarAviso(tipo: string, id: string, mp: MP, db: Banco) {
   if (!id) return "ignorado: sem id";
@@ -132,8 +152,20 @@ export async function processarAviso(tipo: string, id: string, mp: MP, db: Banco
   if (tipo === "subscription_authorized_payment") {
     const pag = await mp.get("/authorized_payments/" + id);
     if (!pag.preapproval_id) return "ignorado: pagamento sem assinatura";
-    await sincronizar(await mp.get("/preapproval/" + pag.preapproval_id), db);
-    return "pagamento processado";
+    const pre: Preapproval = await mp.get("/preapproval/" + pag.preapproval_id);
+    await sincronizar(pre, db);
+    const a = await db.porPreapproval(pre.id);
+    const valor = Number(pag.transaction_amount ?? pre.auto_recurring?.transaction_amount);
+    await db.registrarPagamento({
+      mp_id: String(pag.id ?? id),
+      assinatura_id: a?.id ?? null, user_id: a?.user_id ?? null, plano_id: a?.plano_id ?? null,
+      valor: Number.isFinite(valor) ? valor : null,
+      status: statusPagamento(pag),
+      status_mp: String(pag.payment?.status ?? pag.status ?? ""),
+      data: pag.debit_date ?? pag.date_created ?? null,
+      dados_mp: pag,
+    });
+    return "pagamento registrado: " + statusPagamento(pag);
   }
   return "ignorado: tipo " + tipo;
 }

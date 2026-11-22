@@ -8,7 +8,7 @@ Siga na ordem. Onde aparecer **[você]**, é uma etapa que só você pode fazer 
 | Peça | Serviço | Onde ficam os dados |
 |---|---|---|
 | Site (páginas) | Cloudflare Pages | Só os arquivos do site, sem dados de alunos |
-| Login e banco de dados | Supabase, região **São Paulo** | Contas, assinaturas, progresso, respostas, questões e gabaritos |
+| Login e banco de dados | Supabase, região **São Paulo** | Contas, assinaturas, pagamentos, histórico de acessos, progresso, respostas, questões e gabaritos |
 | Pagamento | Mercado Pago (conta do seu MEI) | Dados de cartão e Pix (nunca passam pelo site) |
 | Vídeos | Bunny Stream (link assinado que expira) | Vídeos |
 | Endereço | Registro.br | — |
@@ -49,6 +49,19 @@ Aluno ──► site (Cloudflare) ──► Supabase (login + banco, São Paulo)
      delete from auth.mfa_factors
      where user_id = (select id from auth.users where email = 'SEU-EMAIL-AQUI');
      ```
+
+### Dados guardados e por quanto tempo
+
+| Tabela | O que guarda | Por quanto tempo |
+|---|---|---|
+| `perfis`, `progresso`, `tentativas` | Nome, progresso nos vídeos, respostas | Enquanto a conta existir |
+| `acessos` | Cada login e cada vídeo aberto, com data e hora | **2 anos** (limpeza automática diária) |
+| `assinaturas`, `assinatura_eventos` | Plano, situação e cada mudança (criada, ativada, renovada, pausada, cancelada, reativada) | Permanente; se a conta for excluída, fica sem identificar a pessoa |
+| `pagamentos` | Cada cobrança: data, valor, situação e o aviso completo do Mercado Pago | Permanente (registro fiscal); se a conta for excluída, fica sem identificar a pessoa |
+
+- **Limpeza dos acessos:** o `schema.sql` agenda a limpeza com a extensão **pg_cron**. Se, ao rodar o arquivo, aparecer o aviso *"Limpeza automática NÃO agendada"*, ative **pg_cron** em *Database > Extensions* (ou *Integrations > Cron*) e rode o `schema.sql` de novo. Para conferir: `select * from cron.job;` deve mostrar `limpar-acessos`.
+- **Cópias de segurança:** o plano gratuito do Supabase não faz backup automático. Antes de abrir as vendas, assine o **plano Pro**, que faz backup diário. Para guardar uma cópia sua de tempos em tempos: *Database > Backups* (no Pro) ou baixe as tabelas em CSV pelo *Table Editor*.
+- **Onde ver os dados:** na própria plataforma, em *Administração > Relatórios* (indicadores, receita mensal, vídeos mais assistidos, histórico completo de um aluno pelo e-mail e planilha de pagamentos do mês para o contador). Também dá para ver tudo no *Table Editor* do Supabase.
 
 ## 2. Mercado Pago (pagamento)
 
@@ -115,6 +128,8 @@ São quatro funções na pasta `supabase/functions`: `criar-assinatura`, `cancel
    O Mercado Pago pode exigir que o e-mail da conta do site seja o mesmo da conta que paga.
 3. Pague com um cartão de teste (lista na documentação do Mercado Pago).
 4. Confira: em *Minha conta* a assinatura fica **Ativa** em poucos minutos, e os vídeos liberam.
+   Confira também em *Administração > Relatórios > Histórico de um aluno* que o pagamento apareceu com **valor e situação corretos**.
+   Se o valor vier vazio ou a situação como "Outro", abra a tabela `pagamentos` no Supabase, copie o conteúdo da coluna `dados_mp` (o aviso completo do Mercado Pago) e me envie: ajusto a leitura dos campos.
    Se ficar "Aguardando pagamento", veja **Edge Functions > webhook-mercadopago > Logs** no Supabase.
 5. Cancele em *Minha conta* e confira que o acesso continua até a data mostrada.
 6. Abra um vídeo como assinante e confira que ele toca. Copie o endereço do player e abra em outra aba ou outro navegador depois de 3 horas: deve dar erro.
@@ -149,5 +164,5 @@ São quatro funções na pasta `supabase/functions`: `criar-assinatura`, `cancel
 
 ## Testes automáticos
 
-- Funções do servidor: `deno test supabase/functions/_shared/` (14 testes: pagamento e link assinado do Bunny).
-- As regras de acesso do banco foram testadas em PostgreSQL 16 com 45 cenários (visitante, sem plano, assinante, vencido, admin com e sem verificação em duas etapas).
+- Funções do servidor: `deno test supabase/functions/_shared/` (17 testes: assinatura, registro de cada cobrança e link assinado do Bunny).
+- As regras de acesso do banco foram testadas em PostgreSQL 16 com 45 cenários (visitante, sem plano, assinante, vencido, admin com e sem verificação em duas etapas), e os históricos com outros 31 (eventos automáticos, limpeza de 2 anos, relatórios, exclusão com anonimização).

@@ -64,7 +64,7 @@ create table if not exists public.planos (
 -- ---------------------------------------------------------------------
 create table if not exists public.assinaturas (
   id                 uuid primary key default gen_random_uuid(),
-  user_id            uuid not null references auth.users(id) on delete cascade,
+  user_id            uuid references auth.users(id) on delete set null, -- fica vazio se a conta for excluída (registro fiscal anonimizado)
   plano_id           text not null references public.planos(id),
   status             text not null default 'pendente'
                      check (status in ('pendente', 'ativa', 'pausada', 'cancelada')),
@@ -75,6 +75,11 @@ create table if not exists public.assinaturas (
   atualizado_em      timestamptz not null default now()
 );
 create index if not exists assinaturas_user_idx on public.assinaturas(user_id);
+-- (para bancos criados com a versão anterior deste arquivo)
+alter table public.assinaturas alter column user_id drop not null;
+alter table public.assinaturas drop constraint if exists assinaturas_user_id_fkey;
+alter table public.assinaturas add constraint assinaturas_user_id_fkey
+  foreign key (user_id) references auth.users(id) on delete set null;
 
 -- Tem acesso = assinatura com acesso_ate no futuro (ou é admin).
 -- Quem cancela continua assistindo até o fim do período já pago.
@@ -259,7 +264,9 @@ begin
        where q.video_id = p_video), '[]'::jsonb));
 end $$;
 
--- Excluir a própria conta (LGPD). Apaga perfil, progresso, tentativas e assinaturas em cascata.
+-- Excluir a própria conta (LGPD). Apaga perfil, progresso, respostas e acessos.
+-- Assinaturas, pagamentos e eventos ficam guardados SEM identificar a pessoa
+-- (o vínculo com a conta fica vazio), porque registros de cobrança são exigidos pela lei fiscal.
 create or replace function public.excluir_minha_conta()
 returns void language plpgsql security definer set search_path = public, auth as $$
 begin
@@ -343,6 +350,167 @@ begin
     from public.videos v where v.id = p_id);
 end $$;
 
+
+-- ---------------------------------------------------------------------
+-- HISTÓRICOS
+-- ---------------------------------------------------------------------
+-- Cada cobrança da assinatura (um registro por cobrança, atualizado a cada aviso do Mercado Pago)
+create table if not exists public.pagamentos (
+  id             bigint generated always as identity primary key,
+  mp_id          text not null unique,               -- id da cobrança no Mercado Pago (authorized_payment)
+  assinatura_id  uuid references public.assinaturas(id) on delete set null,
+  user_id        uuid references auth.users(id) on delete set null,
+  plano_id       text,
+  valor          numeric(10,2),
+  status         text not null default 'outro'
+                 check (status in ('aprovado', 'recusado', 'pendente', 'estornado', 'cancelado', 'agendado', 'outro')),
+  status_mp      text not null default '',           -- situação exatamente como veio do Mercado Pago
+  data           timestamptz,                        -- data da cobrança
+  dados_mp       jsonb not null default '{}',        -- aviso completo, para conferência
+  criado_em      timestamptz not null default now(),
+  atualizado_em  timestamptz not null default now()
+);
+create index if not exists pagamentos_user_idx on public.pagamentos(user_id, data desc);
+create index if not exists pagamentos_data_idx on public.pagamentos(data);
+
+-- Cada mudança da assinatura: criada, ativada, renovada, pausada, cancelada, reativada
+create table if not exists public.assinatura_eventos (
+  id               bigint generated always as identity primary key,
+  assinatura_id    uuid references public.assinaturas(id) on delete set null,
+  user_id          uuid references auth.users(id) on delete set null,
+  plano_id         text,
+  evento           text not null,
+  status_anterior  text,
+  status_novo      text,
+  acesso_ate       timestamptz,
+  criado_em        timestamptz not null default now()
+);
+create index if not exists eventos_user_idx on public.assinatura_eventos(user_id, criado_em desc);
+create index if not exists eventos_data_idx on public.assinatura_eventos(criado_em);
+
+create or replace function public.registrar_evento_assinatura()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_evento text;
+begin
+  if tg_op = 'INSERT' then
+    v_evento := case when new.status = 'ativa' then 'ativada' else 'criada' end;
+  elsif new.status is distinct from old.status then
+    v_evento := case
+      when new.status = 'ativa' and old.status = 'pendente' then 'ativada'
+      when new.status = 'ativa' then 'reativada'
+      when new.status = 'pausada' then 'pausada'
+      when new.status = 'cancelada' then 'cancelada'
+      else new.status end;
+  elsif new.status = 'ativa' and new.acesso_ate > coalesce(old.acesso_ate, '-infinity') then
+    v_evento := 'renovada';
+  else
+    return new;
+  end if;
+  insert into public.assinatura_eventos (assinatura_id, user_id, plano_id, evento, status_anterior, status_novo, acesso_ate)
+  values (new.id, new.user_id, new.plano_id, v_evento, case when tg_op = 'UPDATE' then old.status end, new.status, new.acesso_ate);
+  return new;
+end $$;
+drop trigger if exists ao_mudar_assinatura on public.assinaturas;
+create trigger ao_mudar_assinatura after insert or update on public.assinaturas
+  for each row execute function public.registrar_evento_assinatura();
+
+-- Acessos: logins e vídeos abertos. Guardados por 2 anos.
+create table if not exists public.acessos (
+  id         bigint generated always as identity primary key,
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  tipo       text not null check (tipo in ('login', 'video')),
+  video_id   bigint references public.videos(id) on delete set null,
+  criado_em  timestamptz not null default now()
+);
+create index if not exists acessos_user_idx on public.acessos(user_id, criado_em desc);
+create index if not exists acessos_video_idx on public.acessos(video_id, criado_em);
+create index if not exists acessos_data_idx on public.acessos(criado_em);
+
+create or replace function public.registrar_acesso(p_tipo text, p_video bigint default null)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'não autenticado' using errcode = '42501'; end if;
+  if p_tipo = 'video' and not public.pode_assistir(p_video) then
+    raise exception 'sem acesso a este vídeo' using errcode = '42501';
+  end if;
+  insert into public.acessos (user_id, tipo, video_id)
+  values (auth.uid(), p_tipo, case when p_tipo = 'video' then p_video end);
+end $$;
+
+create or replace function public.limpar_acessos_antigos()
+returns int language sql security definer set search_path = public as $$
+  with apagados as (delete from public.acessos where criado_em < now() - interval '2 years' returning 1)
+  select count(*)::int from apagados;
+$$;
+
+-- Limpeza automática todo dia às 4h17 (UTC). Precisa da extensão pg_cron.
+do $$
+begin
+  create extension if not exists pg_cron;
+  perform cron.schedule('limpar-acessos', '17 4 * * *', 'select public.limpar_acessos_antigos()');
+exception when others then
+  raise notice 'Limpeza automática NÃO agendada (pg_cron indisponível: %). Ative "pg_cron" em Database > Extensions e rode este arquivo de novo.', sqlerrm;
+end $$;
+
+-- ---------------------------------------------------------------------
+-- RELATÓRIOS (administração)
+-- ---------------------------------------------------------------------
+create or replace function public.admin_relatorio()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare
+  inicio_mes timestamptz := date_trunc('month', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo';
+begin
+  if not public.is_admin() then raise exception 'apenas administradores' using errcode = '42501'; end if;
+  return jsonb_build_object(
+    'ativos', (select count(distinct user_id) from public.assinaturas where acesso_ate > now() and user_id is not null),
+    'por_plano', coalesce((select jsonb_object_agg(plano_id, n) from (
+        select plano_id, count(distinct user_id) n from public.assinaturas
+        where acesso_ate > now() and status = 'ativa' and user_id is not null group by plano_id) x), '{}'::jsonb),
+    'pendentes', (select count(*) from public.assinaturas where status = 'pendente' and criado_em > now() - interval '30 days'),
+    'cadastros_mes', (select count(*) from public.perfis where criado_em >= inicio_mes),
+    'cancelamentos_mes', (select count(*) from public.assinatura_eventos where evento = 'cancelada' and criado_em >= inicio_mes),
+    'novas_mes', (select count(*) from public.assinatura_eventos where evento = 'ativada' and criado_em >= inicio_mes),
+    'receita_mes', (select coalesce(sum(valor), 0) from public.pagamentos where status = 'aprovado' and data >= inicio_mes),
+    'receita_meses', (select jsonb_agg(jsonb_build_object('mes', to_char(m, 'YYYY-MM'), 'valor', coalesce(v, 0)) order by m) from (
+        select m, (select sum(valor) from public.pagamentos p
+                   where p.status = 'aprovado' and p.data >= (m at time zone 'America/Sao_Paulo')
+                     and p.data < ((m + interval '1 month') at time zone 'America/Sao_Paulo')) v
+        from generate_series(date_trunc('month', now() at time zone 'America/Sao_Paulo') - interval '5 months',
+                             date_trunc('month', now() at time zone 'America/Sao_Paulo'), interval '1 month') m) x),
+    'videos_top', coalesce((select jsonb_agg(x order by x.acessos desc) from (
+        select v.id, v.titulo, v.curso, count(*)::int acessos, count(distinct a.user_id)::int alunos
+        from public.acessos a join public.videos v on v.id = a.video_id
+        where a.tipo = 'video' and a.criado_em > now() - interval '30 days'
+        group by v.id, v.titulo, v.curso order by count(*) desc limit 10) x), '[]'::jsonb),
+    'gerado_em', now()
+  );
+end $$;
+
+-- Histórico completo de um aluno, buscado pelo e-mail
+create or replace function public.admin_aluno(p_email text)
+returns jsonb language plpgsql stable security definer set search_path = public, auth as $$
+declare u record;
+begin
+  if not public.is_admin() then raise exception 'apenas administradores' using errcode = '42501'; end if;
+  select id, email, created_at, last_sign_in_at into u from auth.users where lower(email) = lower(trim(p_email));
+  if u.id is null then return null; end if;
+  return jsonb_build_object(
+    'email', u.email, 'cadastro', u.created_at, 'ultimo_login', u.last_sign_in_at,
+    'nome', (select nome from public.perfis where id = u.id),
+    'assinaturas', coalesce((select jsonb_agg(to_jsonb(a) - 'user_id' order by a.criado_em desc) from public.assinaturas a where a.user_id = u.id), '[]'::jsonb),
+    'pagamentos', coalesce((select jsonb_agg(jsonb_build_object('data', p.data, 'valor', p.valor, 'status', p.status, 'status_mp', p.status_mp, 'plano_id', p.plano_id, 'mp_id', p.mp_id) order by p.data desc nulls last) from public.pagamentos p where p.user_id = u.id), '[]'::jsonb),
+    'eventos', coalesce((select jsonb_agg(jsonb_build_object('data', e.criado_em, 'evento', e.evento, 'plano_id', e.plano_id, 'acesso_ate', e.acesso_ate) order by e.criado_em desc) from public.assinatura_eventos e where e.user_id = u.id), '[]'::jsonb),
+    'acessos', coalesce((select jsonb_agg(x order by x.data desc) from (
+        select a.criado_em data, a.tipo, v.titulo from public.acessos a left join public.videos v on v.id = a.video_id
+        where a.user_id = u.id order by a.criado_em desc limit 100) x), '[]'::jsonb),
+    'progresso', coalesce((select jsonb_agg(jsonb_build_object('titulo', v.titulo, 'liberado', pr.liberado,
+        'fracao', case when pr.duracao > 0 then least(1, cardinality(pr.segundos) / floor(pr.duracao)) else 0 end, 'data', pr.atualizado_em) order by pr.atualizado_em desc)
+        from public.progresso pr join public.videos v on v.id = pr.video_id where pr.user_id = u.id), '[]'::jsonb),
+    'tentativas', coalesce((select jsonb_agg(jsonb_build_object('titulo', v.titulo, 'acertos', t.acertos, 'total', t.total, 'data', t.criado_em) order by t.criado_em desc)
+        from public.tentativas t join public.videos v on v.id = t.video_id where t.user_id = u.id), '[]'::jsonb)
+  );
+end $$;
+
 -- ---------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------
@@ -355,6 +523,9 @@ alter table public.questoes        enable row level security;
 alter table public.gabaritos       enable row level security;
 alter table public.progresso       enable row level security;
 alter table public.tentativas      enable row level security;
+alter table public.pagamentos      enable row level security;
+alter table public.assinatura_eventos enable row level security;
+alter table public.acessos         enable row level security;
 
 do $$ declare r record; begin
   for r in select policyname, tablename from pg_policies where schemaname = 'public' loop
@@ -393,12 +564,25 @@ create policy gabaritos_admin on public.gabaritos for all using (public.is_admin
 create policy progresso_ler on public.progresso for select using (user_id = auth.uid());
 create policy tentativas_ler on public.tentativas for select using (user_id = auth.uid() or public.is_admin());
 
+-- Históricos: cada um vê os seus; admin vê todos. Gravação só pelo servidor e pelas funções.
+create policy pagamentos_ler on public.pagamentos for select using (user_id = auth.uid() or public.is_admin());
+create policy eventos_ler on public.assinatura_eventos for select using (user_id = auth.uid() or public.is_admin());
+create policy acessos_ler on public.acessos for select using (user_id = auth.uid() or public.is_admin());
+
 -- ---------------------------------------------------------------------
 -- Permissões das funções
 -- ---------------------------------------------------------------------
 revoke execute on function public.registrar_progresso(bigint, int[], numeric) from public, anon;
 revoke execute on function public.corrigir(bigint, jsonb) from public, anon;
 revoke execute on function public.excluir_minha_conta() from public, anon;
+revoke execute on function public.registrar_acesso(text, bigint) from public, anon;
+revoke execute on function public.limpar_acessos_antigos() from public, anon, authenticated;
+revoke execute on function public.registrar_evento_assinatura() from public, anon, authenticated;
+revoke execute on function public.admin_relatorio() from public, anon;
+revoke execute on function public.admin_aluno(text) from public, anon;
+grant execute on function public.registrar_acesso(text, bigint) to authenticated;
+grant execute on function public.admin_relatorio() to authenticated;
+grant execute on function public.admin_aluno(text) to authenticated;
 revoke execute on function public.salvar_video_interno(jsonb) from public, anon, authenticated;
 revoke execute on function public.admin_salvar_video(jsonb) from public, anon;
 revoke execute on function public.admin_obter_video(bigint) from public, anon;

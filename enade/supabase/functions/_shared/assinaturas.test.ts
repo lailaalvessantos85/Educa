@@ -1,7 +1,7 @@
 // Testes das regras de assinatura. Rodar com: deno test supabase/functions/_shared/
 import {
   type Assinatura, avisoAutentico, type Banco, calcularAcesso, cancelarAssinatura, criarAssinatura, mercadoPago,
-  processarAviso, TOLERANCIA_DIAS,
+  type Pagamento, processarAviso, statusPagamento, TOLERANCIA_DIAS,
 } from "./assinaturas.ts";
 
 function igual(a: unknown, b: unknown, msg = "") {
@@ -20,8 +20,13 @@ function bancoFalso(inicial: Assinatura[] = []) {
     semestral: { id: "semestral", nome: "Semestral", preco: 149.9, meses: 6, ativo: true },
     velho: { id: "velho", nome: "Velho", preco: 10, meses: 1, ativo: false },
   };
-  const db: Banco & { linhas: Assinatura[] } = {
-    linhas,
+  const pagamentos: Pagamento[] = [];
+  const db: Banco & { linhas: Assinatura[]; pagamentos: Pagamento[] } = {
+    linhas, pagamentos,
+    registrarPagamento: async (p) => {
+      const i = pagamentos.findIndex((x) => x.mp_id === p.mp_id);
+      if (i >= 0) pagamentos[i] = p; else pagamentos.push(p);
+    },
     plano: async (id) => planos[id] ?? null,
     assinaturaComAcesso: async (u) => linhas.find((l) => l.user_id === u && l.acesso_ate && new Date(l.acesso_ate) > new Date()) ?? null,
     assinaturaCancelavel: async (u) => linhas.find((l) => l.user_id === u && ["ativa", "pausada", "pendente"].includes(l.status) && l.mp_preapproval_id) ?? null,
@@ -89,7 +94,7 @@ Deno.test("aviso de pagamento: busca a assinatura ligada ao pagamento", async ()
     "GET /preapproval/pre1": { id: "pre1", status: "authorized", next_payment_date: FUTURO },
   });
   const db = bancoFalso([{ id: "a", user_id: "u1", plano_id: "mensal", status: "ativa", mp_preapproval_id: "pre1", acesso_ate: null, proxima_cobranca: null }]);
-  igual(await processarAviso("subscription_authorized_payment", "777", mp, db), "pagamento processado");
+  igual(await processarAviso("subscription_authorized_payment", "777", mp, db), "pagamento registrado: outro");
   igual(chamadas.map((c) => c.url), ["/authorized_payments/777", "/preapproval/pre1"]);
   igual(db.linhas[0].acesso_ate, mais3(FUTURO));
 });
@@ -144,4 +149,40 @@ Deno.test("assinatura digital do aviso: aceita a válida e recusa a falsa", asyn
   igual(await avisoAutentico(h(v1), id, segredo), true, "válida");
   igual(await avisoAutentico(h("0".repeat(64)), id, segredo), false, "falsa");
   igual(await avisoAutentico(new Headers(), id, segredo), false, "sem cabeçalho");
+});
+
+Deno.test("pagamento: cada cobrança vira um registro, atualizado a cada aviso", async () => {
+  const rotas: Record<string, unknown> = {
+    "GET /authorized_payments/900": { id: 900, preapproval_id: "pre1", status: "scheduled", transaction_amount: 29.9, date_created: "2026-11-01T10:00:00Z" },
+    "GET /preapproval/pre1": { id: "pre1", status: "authorized", next_payment_date: FUTURO, auto_recurring: { transaction_amount: 29.9 } },
+  };
+  const { mp } = mpFalso(rotas);
+  const db = bancoFalso([{ id: "a", user_id: "u1", plano_id: "mensal", status: "ativa", mp_preapproval_id: "pre1", acesso_ate: null, proxima_cobranca: null }]);
+  igual(await processarAviso("subscription_authorized_payment", "900", mp, db), "pagamento registrado: agendado");
+  // segundo aviso da MESMA cobrança: agora paga
+  rotas["GET /authorized_payments/900"] = { id: 900, preapproval_id: "pre1", status: "processed", transaction_amount: 29.9, debit_date: "2026-11-02T10:00:00Z", payment: { id: 55, status: "approved" } };
+  await processarAviso("subscription_authorized_payment", "900", mp, db);
+  igual(db.pagamentos.length, 1, "não duplica");
+  const p = db.pagamentos[0];
+  igual([p.mp_id, p.status, p.status_mp, p.valor, p.user_id, p.plano_id, p.assinatura_id, p.data],
+    ["900", "aprovado", "approved", 29.9, "u1", "mensal", "a", "2026-11-02T10:00:00Z"]);
+});
+
+Deno.test("pagamento: sem valor na cobrança, usa o valor da assinatura", async () => {
+  const { mp } = mpFalso({
+    "GET /authorized_payments/901": { id: 901, preapproval_id: "pre1", payment: { status: "rejected" } },
+    "GET /preapproval/pre1": { id: "pre1", status: "authorized", next_payment_date: FUTURO, auto_recurring: { transaction_amount: 149.9 } },
+  });
+  const db = bancoFalso([{ id: "a", user_id: "u1", plano_id: "semestral", status: "ativa", mp_preapproval_id: "pre1", acesso_ate: null, proxima_cobranca: null }]);
+  await processarAviso("subscription_authorized_payment", "901", mp, db);
+  igual([db.pagamentos[0].valor, db.pagamentos[0].status], [149.9, "recusado"]);
+});
+
+Deno.test("situação da cobrança: tradução para português", () => {
+  igual(statusPagamento({ payment: { status: "approved" } }), "aprovado");
+  igual(statusPagamento({ payment: { status: "refunded" } }), "estornado");
+  igual(statusPagamento({ payment: { status: "charged_back" } }), "estornado");
+  igual(statusPagamento({ status: "recycling" }), "recusado");
+  igual(statusPagamento({ status: "scheduled" }), "agendado");
+  igual(statusPagamento({ status: "algo_novo" }), "outro");
 });

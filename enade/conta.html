@@ -22,6 +22,11 @@
     <div id="assinatura"><p class="tcount">Carregando…</p></div>
   </section>
 
+  <section class="caixa secao" id="secpag" hidden>
+    <h2>Histórico de pagamentos</h2>
+    <div id="pagamentos"></div>
+  </section>
+
   <section class="caixa secao">
     <h2>Dados pessoais</h2>
     <form id="fnome">
@@ -101,6 +106,17 @@
     });
   }
   renderAssinatura();
+
+  // Histórico de pagamentos do próprio aluno
+  Api.meusPagamentos().then(function (ps) {
+    if (!ps.length) return;
+    var NOMES_PG = { aprovado: "Aprovado", recusado: "Recusado", pendente: "Pendente", estornado: "Estornado", cancelado: "Cancelado", agendado: "Agendado", outro: "—" };
+    document.getElementById("secpag").hidden = false;
+    document.getElementById("pagamentos").innerHTML = ps.map(function (p) {
+      return '<div class="linha"><span class="rot">' + dataBR(p.data) + ' · ' + esc(p.plano_id || "") + '</span><span class="val">' +
+        (p.valor == null ? "" : brl(p.valor) + " · ") + (NOMES_PG[p.status] || p.status) + '</span></div>';
+    }).join("");
+  }).catch(function (err) { console.error(err); });
 
   // Voltando do Mercado Pago: confere algumas vezes até o aviso de pagamento chegar
   if (new URLSearchParams(location.search).get("retorno") === "mp") {

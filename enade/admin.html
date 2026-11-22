@@ -54,6 +54,37 @@
   <h1>Administração</h1>
   <p class="lead">Cadastre vídeos e questões, e ajuste os planos. Tudo é salvo direto no banco de dados.</p>
 
+  <section class="secao-adm" id="sec-rel">
+    <div class="adm-top"><h2>Relatórios</h2><span class="hint" id="relhora"></span></div>
+    <div class="kpis" id="kpis"><p class="tcount">Carregando…</p></div>
+    <div class="grid2c">
+      <div class="painel">
+        <h3>Receita dos últimos 6 meses</h3>
+        <p class="sub2">Pagamentos aprovados, por mês</p>
+        <div id="grafico"></div>
+        <details><summary>Ver em tabela</summary><div id="tabreceita"></div></details>
+      </div>
+      <div class="painel">
+        <h3>Vídeos mais assistidos</h3>
+        <p class="sub2">Últimos 30 dias</p>
+        <div class="tabwrap" id="topvideos"></div>
+      </div>
+    </div>
+    <div class="painel">
+      <h3>Pagamentos para o contador</h3>
+      <p class="sub2">Baixe uma planilha (CSV) com todas as cobranças de um mês.</p>
+      <div class="acoes"><input type="month" id="mescsv" style="font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px">
+        <button class="btn sec" type="button" id="baixarcsv">Baixar planilha</button></div>
+    </div>
+    <div class="painel">
+      <h3>Histórico de um aluno</h3>
+      <p class="sub2">Assinaturas, pagamentos, acessos e desempenho, pelo e-mail de cadastro.</p>
+      <form class="acoes" id="fbusca"><input type="email" name="email" placeholder="email@exemplo.com" required style="font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-width:260px;flex:1;max-width:380px">
+        <button class="btn sec" type="submit">Buscar</button></form>
+      <div class="aluno" id="aluno"></div>
+    </div>
+  </section>
+
   <section class="secao-adm" id="sec-lista">
     <div class="adm-top"><h2>Vídeos</h2><button class="btn prim" type="button" id="novo">+ Novo vídeo</button></div>
     <div class="tabwrap"><table class="tabela" id="tvideos"></table></div>
@@ -174,11 +205,11 @@
       ["publicado", "destaque", "gratuito"].forEach(function (k) { f.elements[k].checked = !!v[k]; });
       (v.questoes || []).forEach(function (q) { novaQuestao(q.tipo, q); });
     }
-    $("#sec-form").hidden = false; $("#sec-lista").hidden = true; $("#sec-planos").hidden = true;
+    $("#sec-form").hidden = false; $("#sec-lista").hidden = true; $("#sec-planos").hidden = true; $("#sec-rel").hidden = true;
     window.scrollTo(0, 0);
     atualizarPrevia();
   }
-  function fecharForm() { $("#sec-form").hidden = true; $("#sec-lista").hidden = false; $("#sec-planos").hidden = false; }
+  function fecharForm() { $("#sec-form").hidden = true; $("#sec-lista").hidden = false; $("#sec-planos").hidden = false; $("#sec-rel").hidden = false; }
   $("#novo").addEventListener("click", function () { abrirForm(null); });
   $("#cancelarf").addEventListener("click", fecharForm);
 
@@ -292,7 +323,101 @@
     try { await Api.admin.salvarPlano(p); aviso("Plano salvo."); carregarPlanos(); } catch (err) { aviso(erroAmigavel(err), "erro"); }
   });
 
-  try { await Promise.all([carregarLista(), carregarPlanos()]); }
+  // ---------- Relatórios ----------
+  var MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  function nomeMes(ym) { var p = ym.split("-"); return MESES[+p[1] - 1] + "/" + p[0].slice(2); }
+  function compacto(v) { return v >= 10000 ? "R$ " + (v / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " mil" : brl(v); }
+  function dataHora(d) { return d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—"; }
+  var NOMES_ST = { aprovado: "Aprovado", recusado: "Recusado", pendente: "Pendente", estornado: "Estornado", cancelado: "Cancelado", agendado: "Agendado", outro: "Outro",
+    criada: "Criada", ativada: "Ativada", renovada: "Renovada", pausada: "Pausada", cancelada: "Cancelada", reativada: "Reativada", ativa: "Ativa" };
+  function st(s) { return '<span class="pill-st ' + esc(s) + '">' + esc(NOMES_ST[s] || s) + '</span>'; }
+
+  async function carregarRelatorio() {
+    var r = await Api.admin.relatorio();
+    var planos = Object.keys(r.por_plano || {}).map(function (k) { return r.por_plano[k] + " " + k; }).join(" · ");
+    var tiles = [
+      ["Com acesso agora", r.ativos, (planos ? "pagando: " + planos : "nenhuma assinatura ativa") + (r.ativos > Object.keys(r.por_plano || {}).reduce(function (t, k) { return t + r.por_plano[k]; }, 0) ? " · inclui quem cancelou e ainda tem dias pagos" : "")],
+      ["Receita do mês", brl(r.receita_mes), "pagamentos aprovados"],
+      ["Novas assinaturas", r.novas_mes, "neste mês"],
+      ["Cancelamentos", r.cancelamentos_mes, "neste mês"],
+      ["Cadastros", r.cadastros_mes, "contas criadas neste mês"],
+      ["Aguardando pagamento", r.pendentes, "assinaturas iniciadas nos últimos 30 dias"]
+    ];
+    $("#kpis").innerHTML = tiles.map(function (t) {
+      return '<div class="kpi"><div class="rot">' + t[0] + '</div><div class="num">' + esc(t[1]) + '</div><div class="det">' + esc(t[2]) + '</div></div>';
+    }).join("");
+    $("#relhora").textContent = "Atualizado em " + dataHora(r.gerado_em);
+
+    // Colunas: uma série só (sem legenda). Rótulo só no mês atual e no maior valor; o resto no toque/mouse e na tabela.
+    var ms = r.receita_meses || [], max = Math.max.apply(null, ms.map(function (m) { return +m.valor; }).concat([0]));
+    // escala com valores redondos (4 faixas)
+    var bruto = (max > 0 ? max : 100) / 4, mag = Math.pow(10, Math.floor(Math.log10(bruto)));
+    var passo = [1, 2, 2.5, 5, 10].map(function (k) { return k * mag; }).find(function (x) { return x >= bruto; });
+    var topo = passo * 4, iMax = ms.findIndex(function (m) { return +m.valor === max && max > 0; });
+    var eixo = function (v) { return v >= 10000 ? (v / 1000).toLocaleString("pt-BR") + " mil" : "R$ " + v.toLocaleString("pt-BR"); };
+    $("#grafico").innerHTML = '<div class="grafico"><div class="colunas" role="img" aria-label="Receita mensal: ' + ms.map(function (m) { return nomeMes(m.mes) + " " + brl(m.valor); }).join(", ") + '">' +
+      [0, 1, 2, 3, 4].map(function (i) { return '<div class="tick" style="bottom:' + (i * 25) + '%"><span>' + eixo(i * passo) + '</span></div>'; }).join("") +
+      ms.map(function (m, i) {
+        var h = Math.round(+m.valor / topo * 100), rotulo = (i === ms.length - 1 || i === iMax) && +m.valor > 0;
+        return '<div class="col" tabindex="0"><span class="dica" style="bottom:calc(' + h + '% + 6px)">' + nomeMes(m.mes) + ': ' + brl(m.valor) + '</span>' +
+          (rotulo ? '<span class="cap">' + compacto(+m.valor) + '</span>' : '') +
+          '<div class="barra" style="height:' + h + '%"></div></div>';
+      }).join("") + '</div></div><div class="meses">' + ms.map(function (m) { return '<span>' + nomeMes(m.mes) + '</span>'; }).join("") + '</div>';
+    $("#tabreceita").innerHTML = '<table class="tabela" style="margin-top:8px"><tr><th>Mês</th><th style="text-align:right">Receita</th></tr>' +
+      ms.map(function (m) { return '<tr><td>' + nomeMes(m.mes) + '</td><td style="text-align:right;font-variant-numeric:tabular-nums">' + brl(m.valor) + '</td></tr>'; }).join("") + '</table>';
+
+    var vt = r.videos_top || [], vmax = Math.max.apply(null, vt.map(function (v) { return v.acessos; }).concat([1]));
+    $("#topvideos").innerHTML = vt.length ? '<table class="tabela"><tr><th>Vídeo</th><th>Acessos</th><th>Alunos</th></tr>' + vt.map(function (v) {
+      return '<tr><td>' + esc(v.titulo) + '<div class="hint">' + esc(v.curso) + '</div></td><td style="white-space:nowrap"><span class="minibar" style="width:' + Math.max(4, Math.round(v.acessos / vmax * 90)) + 'px"></span>' + v.acessos + '</td><td>' + v.alunos + '</td></tr>';
+    }).join("") + '</table>' : '<p class="hint">Ainda não há acessos nos últimos 30 dias.</p>';
+  }
+
+  // Planilha de pagamentos do mês (separador ";" e acentos corretos para abrir no Excel)
+  var hoje = new Date();
+  $("#mescsv").value = hoje.getFullYear() + "-" + String(hoje.getMonth() + 1).padStart(2, "0");
+  $("#baixarcsv").addEventListener("click", async function () {
+    var ym = $("#mescsv").value; if (!ym) return;
+    var p = ym.split("-").map(Number);
+    var ini = new Date(p[0], p[1] - 1, 1), fim = new Date(p[0], p[1], 1);
+    try {
+      var linhas = await Api.admin.pagamentosPeriodo(ini.toISOString(), fim.toISOString());
+      var cel = function (x) { return '"' + String(x == null ? "" : x).replace(/"/g, '""') + '"'; };
+      var csv = "\ufeff" + ["Data", "Valor", "Situação", "Situação (Mercado Pago)", "Plano", "ID da cobrança no Mercado Pago", "Conta excluída"].map(cel).join(";") + "\r\n" +
+        linhas.map(function (l) {
+          return [dataHora(l.data), Number(l.valor || 0).toFixed(2).replace(".", ","), NOMES_ST[l.status] || l.status, l.status_mp, l.plano_id, l.mp_id, l.user_id ? "" : "sim"].map(cel).join(";");
+        }).join("\r\n");
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      a.download = "pagamentos-" + ym + ".csv"; document.body.appendChild(a); a.click(); a.remove();
+      aviso(linhas.length + (linhas.length === 1 ? " pagamento exportado." : " pagamentos exportados."));
+    } catch (err) { aviso(erroAmigavel(err), "erro"); }
+  });
+
+  // Histórico de um aluno
+  $("#fbusca").addEventListener("submit", async function (ev) {
+    ev.preventDefault();
+    var box = $("#aluno"), email = this.elements.email.value.trim();
+    box.innerHTML = '<p class="hint">Buscando…</p>';
+    try {
+      var a = await Api.admin.aluno(email);
+      if (!a) { box.innerHTML = '<p class="hint">Nenhuma conta com o e-mail ' + esc(email) + '.</p>'; return; }
+      var tab = function (cab, linhas, vazio) {
+        return linhas.length ? '<div class="tabwrap"><table class="tabela"><tr>' + cab.map(function (c) { return '<th>' + c + '</th>'; }).join("") + '</tr>' +
+          linhas.map(function (l) { return '<tr>' + l.map(function (c) { return '<td>' + c + '</td>'; }).join("") + '</tr>'; }).join("") + '</table></div>' : '<p class="hint">' + vazio + '</p>';
+      };
+      box.innerHTML =
+        '<h4>' + esc(a.nome || "(sem nome)") + ' · ' + esc(a.email) + '</h4>' +
+        '<p class="hint">Cadastro em ' + dataHora(a.cadastro) + ' · Último login ' + dataHora(a.ultimo_login) + '</p>' +
+        '<h4>Assinaturas</h4>' + tab(["Plano", "Situação", "Acesso até", "Início"], a.assinaturas.map(function (s) { return [esc(s.plano_id), st(s.status), dataBR(s.acesso_ate) || "—", dataBR(s.criado_em)]; }), "Nenhuma assinatura.") +
+        '<h4>Pagamentos</h4>' + tab(["Data", "Plano", "Valor", "Situação"], a.pagamentos.map(function (p) { return [dataHora(p.data), esc(p.plano_id || ""), p.valor == null ? "—" : brl(p.valor), st(p.status)]; }), "Nenhum pagamento registrado.") +
+        '<h4>Histórico da assinatura</h4>' + tab(["Data", "Evento", "Plano", "Acesso até"], a.eventos.map(function (e) { return [dataHora(e.data), st(e.evento), esc(e.plano_id || ""), dataBR(e.acesso_ate) || "—"]; }), "Sem eventos.") +
+        '<h4>Progresso nos vídeos</h4>' + tab(["Vídeo", "Assistido", "Questões", "Última vez"], a.progresso.map(function (p) { return [esc(p.titulo), Math.round(p.fracao * 100) + "%", p.liberado ? "Liberadas" : "Bloqueadas", dataHora(p.data)]; }), "Ainda não assistiu a nenhum vídeo.") +
+        '<h4>Questões de treino</h4>' + tab(["Vídeo", "Acertos", "Data"], a.tentativas.map(function (t) { return [esc(t.titulo), t.total ? t.acertos + " de " + t.total : "só discursivas", dataHora(t.data)]; }), "Nenhuma tentativa.") +
+        '<h4>Últimos acessos <span class="hint">(até 100; guardados por 2 anos)</span></h4>' + tab(["Data", "Tipo", "Vídeo"], a.acessos.map(function (x) { return [dataHora(x.data), x.tipo === "login" ? "Login" : "Vídeo", esc(x.titulo || "")]; }), "Nenhum acesso registrado.");
+    } catch (err) { box.innerHTML = ""; aviso(erroAmigavel(err), "erro"); }
+  });
+
+  try { await Promise.all([carregarLista(), carregarPlanos(), carregarRelatorio()]); }
   catch (err) { aviso(erroAmigavel(err), "erro"); }
 })();
 </script>

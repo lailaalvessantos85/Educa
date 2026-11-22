@@ -71,5 +71,9 @@ export function banco(sb: SupabaseClient = clienteAdmin()): Banco {
       const { error } = await t().update({ ...dados, atualizado_em: new Date().toISOString() }).eq("id", id);
       if (error) throw error;
     },
+    async registrarPagamento(p) {
+      const { error } = await sb.from("pagamentos").upsert({ ...p, atualizado_em: new Date().toISOString() }, { onConflict: "mp_id" });
+      if (error) throw error;
+    },
   };
 }

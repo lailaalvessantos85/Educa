@@ -16,6 +16,10 @@ com questões de treino liberadas depois de assistir.
 - **Vídeos e treino**: os vídeos ficam no Bunny Stream. Só assinantes recebem o link, que é assinado pelo servidor e expira em 3 horas. As questões liberam quando o aluno assiste a 90% do vídeo,
   conferido pelo servidor. O gabarito fica protegido no banco e só é enviado depois das respostas.
 - **Vídeos grátis**: marque "Grátis" no cadastro do vídeo para liberá-lo a quem só tem conta (amostra).
+- **Histórico guardado**: cada pagamento, cada mudança da assinatura, cada login e vídeo aberto (acessos por 2 anos).
+  O aluno vê os próprios pagamentos em Minha conta.
+- **Relatórios** (na Administração): assinantes com acesso, receita do mês e dos últimos 6 meses, novas assinaturas,
+  cancelamentos, vídeos mais assistidos, histórico completo de um aluno pelo e-mail e planilha de pagamentos para o contador.
 - **Administração** (`admin.html`): cadastrar e editar vídeos e questões, e mudar planos e preços. Só para administradores,
   com **verificação em duas etapas** obrigatória (código de um aplicativo autenticador no celular).
 
