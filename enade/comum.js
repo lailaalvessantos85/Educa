@@ -15,33 +15,22 @@ function esc(s) {
   });
 }
 
-var PLAY_ICON = '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="#fff"/></svg>';
+var PLAY_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>';
 
-function cardHTML(v, i) {
+function cardHTML(v, i, assistido) {
   var id = ytId(v.youtube);
-  var tipoCls = v.tipo === "Formação Geral" ? "fg" : "ce";
-  var thumb;
-  if (id) {
-    thumb =
-      '<button class="thumb" type="button" data-play="' + i + '" aria-label="Assistir: ' + esc(v.titulo) + '">' +
+  var fg = v.tipo === "Formação Geral";
+  var badge = v.tipo ? '<span class="badge ' + (fg ? "fg" : "ce") + '" title="' + esc(v.tipo) + '">' + (fg ? "FORMAÇÃO GERAL" : "ESPECÍFICA") + '</span>' : "";
+  var q = '<span class="q"><small>ENADE ' + esc(v.ano) + '</small>' + (v.questao ? "Questão " + esc(v.questao) : "") + '</span>';
+  var thumb = id
+    ? '<button class="thumb" type="button" data-play="' + i + '" aria-label="Assistir: ' + esc(v.titulo) + '">' +
         '<img loading="lazy" src="https://i.ytimg.com/vi/' + id + '/hqdefault.jpg" alt="">' +
-        '<span class="play"><span>' + PLAY_ICON + '</span></span>' +
-        (v.duracao ? '<span class="dur">' + esc(v.duracao) + '</span>' : '') +
-      '</button>';
-  } else {
-    thumb =
-      '<div class="thumb soon"><div class="ph"><strong>Q' + esc(v.questao || "?") + '</strong>' +
-      '<small>ENADE ' + esc(v.ano || "") + ' · vídeo em breve</small></div></div>';
-  }
-  return '<article class="card">' + thumb +
-    '<div class="body">' +
-      '<div class="tags">' +
-        (v.tipo ? '<span class="tag ' + tipoCls + '">' + esc(v.tipo) + '</span>' : '') +
-        (v.tema ? '<span class="tag">' + esc(v.tema) + '</span>' : '') +
-      '</div>' +
-      '<h3>' + esc(v.titulo) + '</h3>' +
-      (v.descricao ? '<p class="d">' + esc(v.descricao) + '</p>' : '') +
-      '<div class="foot"><span><strong>' + esc(v.curso) + '</strong> · ENADE ' + esc(v.ano) +
-        (v.questao ? ', questão ' + esc(v.questao) : '') + '</span><span>com ' + esc(v.professor) + '</span></div>' +
-    '</div></article>';
+        badge + q + (v.duracao ? '<span class="dur">' + esc(v.duracao) + '</span>' : '') +
+        '<span class="playic"><span style="color:#1A1413">' + PLAY_ICON + '</span></span>' +
+      '</button>'
+    : '<div class="thumb soon">' + badge + q + '<span class="soonlbl">Em breve</span></div>';
+  return '<article class="card' + (assistido ? " watched" : "") + '">' + thumb +
+    '<div class="info"><h3>' + esc(v.titulo) + '</h3>' +
+    '<p class="sub"><span class="tema">' + esc(v.tema) + '</span>' + (v.professor ? ' · ' + esc(v.professor) : '') + '</p>' +
+    '<p class="sub">' + esc(v.curso) + '</p></div></article>';
 }

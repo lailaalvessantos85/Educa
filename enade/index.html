@@ -5,67 +5,87 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ENADE Explicado</title>
 <meta name="description" content="Vídeos curtos em que professores explicam questões do ENADE, com filtros por curso, ano, tema e professor.">
+<meta name="theme-color" content="#141111">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Work+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Work+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
-<header class="top wrap">
-  <div class="ribbon" aria-hidden="true"><i style="background:#352D2C"></i><i style="background:#5B413E"></i><i style="background:#AE4B3D"></i><i style="background:#C79A93"></i><i style="background:#EE9D90"></i><i style="background:#FB7D6A"></i><i style="background:#FE5C45"></i></div>
-  <h1>ENADE Explicado</h1>
-  <p>Vídeos curtos em que professores resolvem questões do ENADE passo a passo. Filtre por curso, ano, tema ou professor e assista aqui mesmo.</p>
+
+<header class="topbar" id="topbar">
+  <a class="logo" href="index.html">ENADE <span>Explicado</span></a>
+  <div class="search">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <label class="sr" for="q">Buscar</label>
+    <input id="q" type="search" placeholder="Buscar assunto, título, professor…" autocomplete="off">
+  </div>
+  <button class="fbtn" id="fbtn" type="button" aria-expanded="false" aria-controls="panel">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+    <span class="t">Filtros</span><span class="n" id="nf" hidden></span>
+  </button>
 </header>
 
-<div class="filters">
-  <div class="wrap">
-    <div class="search">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <label class="sr" for="q">Buscar</label>
-      <input id="q" type="search" placeholder="Buscar por assunto, título ou palavra-chave" autocomplete="off">
-    </div>
-    <div class="row">
-      <label>Curso<select data-f="curso"></select></label>
-      <label>Ano<select data-f="ano"></select></label>
-      <label>Tipo de questão<select data-f="tipo"></select></label>
-      <label>Tema<select data-f="tema"></select></label>
-      <label>Professor<select data-f="professor"></select></label>
-    </div>
-    <div class="meta">
-      <span class="count" id="count" aria-live="polite"></span>
-      <div class="chips" id="chips"></div>
-      <button class="linkbtn" id="clear" type="button" hidden>Limpar filtros</button>
-      <label class="sort">Ordenar
-        <select id="sort">
-          <option value="recente">Prova mais recente</option>
-          <option value="antiga">Prova mais antiga</option>
-          <option value="questao">Número da questão</option>
-          <option value="titulo">Título (A–Z)</option>
-        </select>
-      </label>
-    </div>
+<div class="panel" id="panel" hidden>
+  <div class="row">
+    <label>Curso<select data-f="curso"></select></label>
+    <label>Ano<select data-f="ano"></select></label>
+    <label>Tipo de questão<select data-f="tipo"></select></label>
+    <label>Tema<select data-f="tema"></select></label>
+    <label>Professor<select data-f="professor"></select></label>
+  </div>
+  <div class="panelfoot">
+    <label class="sortlbl" style="flex-direction:row;align-items:center;gap:8px">Ordenar
+      <select id="sort" style="width:auto">
+        <option value="recente">Prova mais recente</option>
+        <option value="antiga">Prova mais antiga</option>
+        <option value="questao">Número da questão</option>
+        <option value="titulo">Título (A–Z)</option>
+      </select>
+    </label>
+    <button class="linkbtn" type="button" data-clear>Limpar filtros</button>
   </div>
 </div>
 
-<main class="wrap">
+<!-- Vitrine: destaque + fileiras -->
+<div id="home">
+  <section class="hero" id="hero"></section>
+  <main>
+    <div class="groupby" role="group" aria-label="Organizar fileiras por">
+      <span>Fileiras por</span>
+      <button class="pill" type="button" data-g="curso" aria-pressed="true">Curso</button>
+      <button class="pill" type="button" data-g="tema" aria-pressed="false">Tema</button>
+      <button class="pill" type="button" data-g="ano" aria-pressed="false">Ano</button>
+      <button class="pill" type="button" data-g="professor" aria-pressed="false">Professor</button>
+    </div>
+    <div id="lanes"></div>
+  </main>
+</div>
+
+<!-- Resultados de busca/filtro -->
+<div id="res" hidden>
+  <div class="results">
+    <h2 id="count" aria-live="polite"></h2>
+    <div class="chips" id="chips"></div>
+  </div>
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty" hidden>
-    <h2>Nenhum vídeo encontrado</h2>
-    <p>Tente outra palavra na busca ou <button class="linkbtn" type="button" data-clear>limpe os filtros</button>.</p>
+    <h3>Nenhum vídeo encontrado</h3>
+    <p>Tente outra palavra ou <button class="linkbtn" type="button" data-clear>limpe os filtros</button>.</p>
   </div>
-</main>
+</div>
 
 <dialog id="player" aria-labelledby="ptitle">
   <div class="player">
     <div class="frame" id="frame"></div>
-    <div class="info">
-      <div><h2 id="ptitle"></h2><p id="pmeta"></p></div>
+    <div class="pinfo">
+      <div><h2 id="ptitle"></h2><p id="pmeta"></p><p id="pdesc"></p></div>
       <button class="close" type="button" id="pclose">Fechar</button>
     </div>
   </div>
 </dialog>
 
-<footer class="wrap">Questões do Exame Nacional de Desempenho dos Estudantes (ENADE/INEP). Vídeos hospedados no YouTube.</footer>
+<footer>Questões do Exame Nacional de Desempenho dos Estudantes (ENADE/INEP). Vídeos hospedados no YouTube.</footer>
 
 <script src="videos.js"></script>
 <script src="comum.js"></script>
@@ -74,14 +94,19 @@
   var VIDEOS = (window.VIDEOS || []).map(function (v, i) { v._i = i; return v; });
   var FILTROS = ["curso", "ano", "tipo", "tema", "professor"];
   var NOMES = { curso: "Curso", ano: "Ano", tipo: "Tipo", tema: "Tema", professor: "Professor" };
-  var estado = { q: "", sort: "recente" };
+  var estado = { q: "", sort: "recente", g: "curso" };
   FILTROS.forEach(function (f) { estado[f] = ""; });
 
   var $ = function (s) { return document.querySelector(s); };
   var selects = {};
   document.querySelectorAll("select[data-f]").forEach(function (s) { selects[s.dataset.f] = s; });
 
-  // Busca sem diferenciar acentos e maiúsculas.
+  // Vídeos já assistidos ficam marcados com uma barrinha (salvo só neste navegador).
+  var vistos = {};
+  try { vistos = JSON.parse(localStorage.getItem("enade-vistos") || "{}") || {}; } catch (e) {}
+  function marcarVisto(id) { vistos[id] = 1; try { localStorage.setItem("enade-vistos", JSON.stringify(vistos)); } catch (e) {} }
+  function card(v) { return cardHTML(v, v._i, !!vistos[ytId(v.youtube)]); }
+
   function norm(s) { return String(s == null ? "" : s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
   VIDEOS.forEach(function (v) {
     v._txt = norm([v.titulo, v.descricao, v.tema, v.curso, v.professor, v.tipo, v.ano, "questao " + v.questao].join(" "));
@@ -98,8 +123,15 @@
     }
     return true;
   }
+  function ordenar(lista, s) {
+    return lista.slice().sort(function (a, b) {
+      if (s === "titulo") return String(a.titulo).localeCompare(b.titulo, "pt-BR");
+      if (s === "questao") return (a.questao || 0) - (b.questao || 0) || (b.ano || 0) - (a.ano || 0);
+      var d = (a.ano || 0) - (b.ano || 0);
+      return (s === "antiga" ? d : -d) || (a.questao || 0) - (b.questao || 0);
+    });
+  }
 
-  // Cada lista mostra só opções que ainda trazem resultado, com a contagem.
   function montarOpcoes() {
     FILTROS.forEach(function (f) {
       var cont = {};
@@ -108,44 +140,108 @@
         if (passa(v, f)) cont[v[f]] = (cont[v[f]] || 0) + 1;
       });
       if (estado[f] && !cont[estado[f]]) cont[estado[f]] = 0;
-      var chaves = Object.keys(cont).sort(function (a, b) {
-        return f === "ano" ? b - a : a.localeCompare(b, "pt-BR");
-      });
-      var html = '<option value="">Todos</option>';
-      chaves.forEach(function (c) {
-        html += '<option value="' + esc(c) + '"' + (c === estado[f] ? " selected" : "") + '>' + esc(c) + ' (' + cont[c] + ')</option>';
-      });
-      selects[f].innerHTML = html;
+      var chaves = Object.keys(cont).sort(function (a, b) { return f === "ano" ? b - a : a.localeCompare(b, "pt-BR"); });
+      selects[f].innerHTML = '<option value="">Todos</option>' + chaves.map(function (c) {
+        return '<option value="' + esc(c) + '"' + (c === estado[f] ? " selected" : "") + '>' + esc(c) + ' (' + cont[c] + ')</option>';
+      }).join("");
     });
   }
 
-  function ordenar(lista) {
-    var s = estado.sort;
-    return lista.sort(function (a, b) {
-      if (s === "titulo") return String(a.titulo).localeCompare(b.titulo, "pt-BR");
-      if (s === "questao") return (a.questao || 0) - (b.questao || 0) || (b.ano || 0) - (a.ano || 0);
-      var d = (a.ano || 0) - (b.ano || 0);
-      return (s === "antiga" ? d : -d) || (a.questao || 0) - (b.questao || 0);
-    });
+  // ---------- Destaque ----------
+  function escolherDestaque() {
+    var com = VIDEOS.filter(function (v) { return ytId(v.youtube); });
+    var marcados = com.filter(function (v) { return v.destaque; });
+    if (marcados.length) return marcados[Math.floor(Math.random() * marcados.length)];
+    return com[com.length - 1] || VIDEOS[VIDEOS.length - 1];
+  }
+  function renderHero() {
+    var v = escolherDestaque(), h = $("#hero");
+    if (!v) { h.innerHTML = '<div class="hero-bg ph"></div><div class="hero-txt"><h1>Em breve</h1><p class="d">Os primeiros vídeos estão chegando.</p></div>'; return; }
+    var id = ytId(v.youtube);
+    var bg = id
+      ? '<img class="hero-bg" alt="" src="https://i.ytimg.com/vi/' + id + '/maxresdefault.jpg" onerror="this.onerror=null;this.src=\'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg\'">'
+      : '<div class="hero-bg ph"></div>';
+    h.innerHTML = bg +
+      '<div class="hero-txt">' +
+        '<span class="kicker">' + (v.destaque ? "Em destaque" : "Novidade") + '</span>' +
+        '<h1>' + esc(v.titulo) + '</h1>' +
+        '<div class="facts"><span class="hl">ENADE ' + esc(v.ano) + '</span>' +
+          (v.questao ? '<span>Questão ' + esc(v.questao) + '</span>' : '') +
+          '<span>' + esc(v.curso) + '</span>' + (v.duracao ? '<span>' + esc(v.duracao) + '</span>' : '') + '</div>' +
+        (v.descricao ? '<p class="d">' + esc(v.descricao) + '</p>' : '<p class="d"></p>') +
+        '<div class="actions">' +
+          (id ? '<button class="btn play" type="button" data-play="' + v._i + '">' + PLAY_ICON + ' Assistir</button>'
+              : '<button class="btn play" type="button" disabled>Em breve</button>') +
+          '<button class="btn sec" type="button" data-curso="' + esc(v.curso) + '">Mais de ' + esc(v.curso) + '</button>' +
+        '</div>' +
+      '</div>';
   }
 
+  // ---------- Fileiras ----------
+  var SETA_E = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>';
+  var SETA_D = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>';
+  function lane(titulo, lista, extra) {
+    return '<section class="lane"><h2>' + esc(titulo) + (extra ? ' <small>' + extra + '</small>' : '') + '</h2>' +
+      '<div class="track-wrap"><button class="arrow l" type="button" aria-label="Voltar" hidden>' + SETA_E + '</button>' +
+      '<div class="track">' + lista.map(card).join("") + '</div>' +
+      '<button class="arrow r" type="button" aria-label="Avançar">' + SETA_D + '</button></div></section>';
+  }
+  function renderLanes() {
+    var html = "";
+    var novos = VIDEOS.slice().reverse().slice(0, 12);
+    html += lane("Adicionados recentemente", novos);
+    var g = estado.g, grupos = {};
+    VIDEOS.forEach(function (v) { var k = v[g] || "Outros"; (grupos[k] = grupos[k] || []).push(v); });
+    Object.keys(grupos).sort(function (a, b) { return g === "ano" ? b - a : a.localeCompare(b, "pt-BR"); }).forEach(function (k) {
+      var n = grupos[k].length;
+      html += lane(g === "ano" ? "ENADE " + k : k, ordenar(grupos[k], "recente"), n + (n === 1 ? " vídeo" : " vídeos"));
+    });
+    $("#lanes").innerHTML = html;
+    document.querySelectorAll(".track").forEach(atualizarSetas);
+  }
+  function atualizarSetas(t) {
+    var w = t.parentNode;
+    w.querySelector(".arrow.l").hidden = t.scrollLeft < 5;
+    w.querySelector(".arrow.r").hidden = t.scrollLeft + t.clientWidth >= t.scrollWidth - 5;
+  }
+  $("#lanes").addEventListener("click", function (e) {
+    var a = e.target.closest(".arrow");
+    if (!a) return;
+    var t = a.parentNode.querySelector(".track");
+    t.scrollBy({ left: (a.classList.contains("l") ? -1 : 1) * t.clientWidth * 0.85, behavior: "smooth" });
+  });
+  $("#lanes").addEventListener("scroll", function (e) { if (e.target.classList.contains("track")) atualizarSetas(e.target); }, true);
+  window.addEventListener("resize", function () { document.querySelectorAll(".track").forEach(atualizarSetas); });
+
+  document.querySelectorAll("[data-g]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      estado.g = b.dataset.g;
+      document.querySelectorAll("[data-g]").forEach(function (x) { x.setAttribute("aria-pressed", x === b); });
+      renderLanes();
+    });
+  });
+
+  // ---------- Resultados ----------
+  function filtrando() { return !!estado.q || FILTROS.some(function (f) { return estado[f]; }); }
   function render() {
     montarOpcoes();
-    var lista = ordenar(VIDEOS.filter(function (v) { return passa(v); }));
-    $("#grid").innerHTML = lista.map(function (v) { return cardHTML(v, v._i); }).join("");
-    $("#empty").hidden = lista.length > 0;
-    $("#count").textContent = lista.length + (lista.length === 1 ? " vídeo" : " vídeos");
-
     var ativos = FILTROS.filter(function (f) { return estado[f]; });
-    $("#chips").innerHTML = ativos.map(function (f) {
-      return '<button class="chip" type="button" data-rm="' + f + '" aria-label="Remover filtro ' + NOMES[f] + '">' +
-        NOMES[f] + ': <b>' + esc(estado[f]) + '</b> ×</button>';
-    }).join("");
-    $("#clear").hidden = !ativos.length && !estado.q;
+    $("#nf").hidden = !ativos.length; $("#nf").textContent = ativos.length;
+    var modoRes = filtrando();
+    $("#home").hidden = modoRes; $("#res").hidden = !modoRes;
+    if (modoRes) {
+      var lista = ordenar(VIDEOS.filter(function (v) { return passa(v); }), estado.sort);
+      $("#grid").innerHTML = lista.map(card).join("");
+      $("#empty").hidden = lista.length > 0;
+      $("#count").textContent = (estado.q ? 'Resultados para "' + estado.q + '": ' : "") + lista.length + (lista.length === 1 ? " vídeo" : " vídeos");
+      $("#chips").innerHTML = ativos.map(function (f) {
+        return '<button class="chip" type="button" data-rm="' + f + '" aria-label="Remover filtro ' + NOMES[f] + '">' + NOMES[f] + ': <b>' + esc(estado[f]) + '</b> ×</button>';
+      }).join("");
+    }
     salvarURL();
+    if (panel) posPainel();
   }
 
-  // Os filtros ficam no endereço da página: dá para mandar o link já filtrado para os alunos.
   function salvarURL() {
     var p = new URLSearchParams();
     FILTROS.concat("q").forEach(function (f) { if (estado[f]) p.set(f, estado[f]); });
@@ -157,50 +253,69 @@
     var p = new URLSearchParams(location.search);
     FILTROS.concat("q").forEach(function (f) { if (p.get(f)) estado[f] = p.get(f); });
     if (p.get("ordem")) estado.sort = p.get("ordem");
-    $("#q").value = estado.q;
-    $("#sort").value = estado.sort;
+    $("#q").value = estado.q; $("#sort").value = estado.sort;
   }
-
   function limpar() {
     FILTROS.forEach(function (f) { estado[f] = ""; });
     estado.q = ""; $("#q").value = "";
-    render();
+    render(); window.scrollTo(0, 0);
   }
 
-  FILTROS.forEach(function (f) {
-    selects[f].addEventListener("change", function () { estado[f] = this.value; render(); });
-  });
+  FILTROS.forEach(function (f) { selects[f].addEventListener("change", function () { estado[f] = this.value; render(); }); });
   var timer;
   $("#q").addEventListener("input", function () {
-    var val = this.value;
-    clearTimeout(timer);
+    var val = this.value; clearTimeout(timer);
     timer = setTimeout(function () { estado.q = val.trim(); render(); }, 150);
   });
   $("#sort").addEventListener("change", function () { estado.sort = this.value; render(); });
-  $("#clear").addEventListener("click", limpar);
-  document.querySelector("[data-clear]").addEventListener("click", limpar);
+  document.querySelectorAll("[data-clear]").forEach(function (b) { b.addEventListener("click", limpar); });
   $("#chips").addEventListener("click", function (e) {
-    var b = e.target.closest("[data-rm]");
-    if (b) { estado[b.dataset.rm] = ""; render(); }
+    var b = e.target.closest("[data-rm]"); if (b) { estado[b.dataset.rm] = ""; render(); }
   });
+
+  // Painel de filtros
+  var panel = $("#panel"), fbtn = $("#fbtn"), topbar = $("#topbar");
+  function posPainel() {
+    panel.style.top = topbar.offsetHeight + "px";
+    // Nos resultados, o conteúdo desce para o painel não cobrir nada.
+    $("#res").style.paddingTop = panel.hidden ? "" : panel.offsetHeight + "px";
+  }
+  function abrirPainel(abrir) {
+    panel.hidden = !abrir; fbtn.setAttribute("aria-expanded", abrir);
+    topbar.classList.toggle("solid", abrir || scrollY > 30); posPainel();
+  }
+  fbtn.addEventListener("click", function () { abrirPainel(panel.hidden); });
+  document.addEventListener("click", function (e) {
+    if (!panel.hidden && !panel.contains(e.target) && !topbar.contains(e.target) && $("#res").hidden) abrirPainel(false);
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !panel.hidden) abrirPainel(false); });
+  window.addEventListener("scroll", function () { topbar.classList.toggle("solid", scrollY > 30 || !panel.hidden); }, { passive: true });
+  window.addEventListener("resize", posPainel);
 
   // Player
   var dlg = $("#player");
-  $("#grid").addEventListener("click", function (e) {
+  document.body.addEventListener("click", function (e) {
+    var c = e.target.closest("[data-curso]");
+    if (c) { estado.curso = c.dataset.curso; render(); window.scrollTo(0, 0); return; }
     var b = e.target.closest("[data-play]");
     if (!b) return;
-    var v = VIDEOS[+b.dataset.play];
-    $("#frame").innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + ytId(v.youtube) +
+    var v = VIDEOS[+b.dataset.play], id = ytId(v.youtube);
+    $("#frame").innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + id +
       '?autoplay=1&rel=0" title="' + esc(v.titulo) + '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
     $("#ptitle").textContent = v.titulo;
-    $("#pmeta").textContent = [v.curso, "ENADE " + v.ano + (v.questao ? ", questão " + v.questao : ""), v.professor].join(" · ");
+    $("#pmeta").textContent = [v.curso, "ENADE " + v.ano + (v.questao ? ", questão " + v.questao : ""), v.tema, v.professor].filter(Boolean).join(" · ");
+    $("#pdesc").textContent = v.descricao || "";
     dlg.showModal();
+    marcarVisto(id);
+    b.closest(".card") && b.closest(".card").classList.add("watched");
   });
   $("#pclose").addEventListener("click", function () { dlg.close(); });
   dlg.addEventListener("click", function (e) { if (e.target === dlg) dlg.close(); });
   dlg.addEventListener("close", function () { $("#frame").innerHTML = ""; });
 
   lerURL();
+  renderHero();
+  renderLanes();
   render();
 })();
 </script>

@@ -6,15 +6,13 @@
 <title>Gerador de cards</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Work+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Work+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
-<header class="top wrap">
+<div class="page">
   <h1>Gerador de cards</h1>
   <p>Preencha os campos, confira a prévia do card e copie o bloco de código. Cole o bloco no arquivo <code>videos.js</code>, antes do <code>];</code> final. <a href="index.html">Voltar para a plataforma</a></p>
-</header>
-<main class="wrap">
   <form class="form" id="f" autocomplete="off">
     <label class="full">Link do vídeo no YouTube
       <input name="youtube" placeholder="https://www.youtube.com/watch?v=... ou https://youtu.be/...">
@@ -30,19 +28,20 @@
     <label>Tema<input name="tema" list="l-tema" placeholder="Ex.: Marketing"></label>
     <label>Professor<input name="professor" list="l-professor" placeholder="Ex.: Profa. Laila"></label>
     <label>Duração<input name="duracao" placeholder="Ex.: 6:40"></label>
+    <label class="check full"><input type="checkbox" name="destaque"> Colocar em destaque no topo da página <span class="hint">(se vários estiverem marcados, a página sorteia um a cada visita)</span></label>
     <label class="full">Descrição (opcional)<textarea name="descricao" placeholder="Uma ou duas frases sobre o que o vídeo explica."></textarea></label>
     <datalist id="l-curso"></datalist><datalist id="l-tema"></datalist><datalist id="l-professor"></datalist>
   </form>
   <div class="out">
-    <div><h2 style="font-size:20px;margin-bottom:10px">Prévia</h2><div id="prev"></div></div>
+    <div><h2>Prévia</h2><div id="prev"></div></div>
     <div>
-      <h2 style="font-size:20px;margin-bottom:10px">Bloco para colar em videos.js</h2>
+      <h2>Bloco para colar em videos.js</h2>
       <pre id="code"></pre>
-      <button class="btn" type="button" id="copy">Copiar bloco</button>
+      <button class="btn copy" type="button" id="copy">Copiar bloco</button>
       <span id="ok" class="hint" style="margin-left:10px" aria-live="polite"></span>
     </div>
   </div>
-</main>
+</div>
 <script src="videos.js"></script>
 <script src="comum.js"></script>
 <script>
@@ -60,6 +59,7 @@
     ["titulo", "youtube", "curso", "ano", "questao", "tipo", "tema", "professor", "duracao", "descricao"].forEach(function (k) {
       d[k] = f.elements[k].value.trim();
     });
+    if (f.elements.destaque.checked) d.destaque = true;
     var id = ytId(d.youtube);
     if (id) d.youtube = "https://youtu.be/" + id;
     return d;
@@ -68,7 +68,7 @@
     var linhas = Object.keys(d).map(function (k) {
       var v = d[k];
       var num = (k === "ano" || k === "questao") && /^\d+$/.test(v);
-      return "    " + k + ": " + (num ? v : JSON.stringify(v));
+      return "    " + k + ": " + (num || typeof v === "boolean" ? v : JSON.stringify(v));
     });
     return "  {\n" + linhas.join(",\n") + "\n  },";
   }
@@ -78,7 +78,7 @@
     document.getElementById("yhint").textContent = !raw ? 'Vale link de vídeo normal, Shorts ou "não listado".'
       : ytId(raw) ? "Vídeo reconhecido: " + ytId(raw) : "Não reconheci esse link. Copie o endereço direto do vídeo no YouTube.";
     var prev = Object.assign({}, d, { titulo: d.titulo || "Título do vídeo", curso: d.curso || "Curso", ano: d.ano || "2024" });
-    document.getElementById("prev").innerHTML = '<div style="max-width:320px">' + cardHTML(prev, 0) + "</div>";
+    document.getElementById("prev").innerHTML = '<div style="max-width:320px">' + cardHTML(prev, 0) + '</div>';
     document.getElementById("code").textContent = bloco(d);
   }
   f.addEventListener("input", atualizar);

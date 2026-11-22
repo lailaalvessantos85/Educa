@@ -3,6 +3,10 @@
 Plataforma estática com vídeos curtos em que professores explicam questões do ENADE.
 Os vídeos ficam no YouTube; a página mostra os cards, filtra e abre o player na própria tela.
 
+Visual no estilo das plataformas de streaming: tema escuro, banner grande com um vídeo em destaque
+e fileiras de cards que rolam para o lado (por curso, tema, ano ou professor, à escolha do aluno).
+Vídeos já assistidos ganham uma barrinha coral embaixo da miniatura (fica salvo só no navegador do aluno).
+
 ## Arquivos
 
 | Arquivo | Para que serve |
@@ -22,7 +26,15 @@ Os vídeos ficam no YouTube; a página mostra os cards, filtra e abre o player n
 Escreva curso, tema e professor **sempre do mesmo jeito** (ex.: sempre "Administração", com acento),
 porque os filtros agrupam pelo texto exato. O gerador sugere os nomes que já existem.
 
+## Vídeo em destaque
+
+Marque `destaque: true` no vídeo (ou a caixinha no gerador). Se vários estiverem marcados, a página
+sorteia um a cada visita. Se nenhum estiver, o banner mostra o último vídeo adicionado.
+
 ## Filtros
+
+Ficam no botão **Filtros** no topo. Ao buscar ou filtrar, as fileiras dão lugar a uma grade com os resultados.
+
 
 - Busca por palavra (ignora acentos e maiúsculas): procura no título, descrição, tema, curso e professor.
 - Listas de Curso, Ano, Tipo de questão (Formação Geral / Componente Específico), Tema e Professor.

@@ -17,6 +17,8 @@
     professor  – quem explica
     duracao    – duração do vídeo (ex.: "6:40")
     descricao  – uma ou duas frases sobre a questão (opcional)
+    destaque   – true para aparecer no banner grande do topo (opcional).
+                 Se nenhum vídeo tiver destaque, o banner mostra o último adicionado.
 
   Os exemplos abaixo estão sem link (youtube: "") e aparecem como
   "Vídeo em breve". Apague-os ou substitua pelos seus vídeos.
