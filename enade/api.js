@@ -193,6 +193,8 @@ var Api = (function () {
     obter: async function (id) { return falhou(await sb.rpc("admin_obter_video", { p_id: id })); },
     salvar: async function (dados) { return falhou(await sb.rpc("admin_salvar_video", { p: dados })); },
     excluir: async function (id) { falhou(await sb.from("videos").delete().eq("id", id)); },
+    publicar: async function (id, sim) { falhou(await sb.from("videos").update({ publicado: !!sim }).eq("id", id)); },
+    excluirPlano: async function (id) { falhou(await sb.from("planos").delete().eq("id", id)); },
     planos: async function () { return falhou(await sb.from("planos").select("*").order("ordem")); },
     salvarPlano: async function (p) { falhou(await sb.from("planos").upsert(p)); },
     relatorio: async function () { return falhou(await sb.rpc("admin_relatorio")); },

@@ -29,7 +29,11 @@
 .qbbtns{display:flex;flex-wrap:wrap;gap:8px}
 .qbbtns .btn,.acoes .btn{font-size:14px;padding:9px 16px}
 .qb{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:14px;display:flex;flex-direction:column;gap:10px}
-.qbtop{display:flex;justify-content:space-between;align-items:center}
+.qbtop{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.qbtop .ord{display:flex;gap:6px;align-items:center}
+.qbtop .mini[disabled]{opacity:.35;cursor:default}
+.busca-adm{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-width:220px}
+.acoes-linha{display:flex;gap:6px;flex-wrap:wrap}
 .qb label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:14px}
 .qb textarea,.qb input:not([type=radio]){font:inherit;font-weight:400;color:var(--ink);background:var(--bg2);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%}
 .qb textarea{min-height:70px;resize:vertical}
@@ -50,9 +54,27 @@
 
 <main class="wrapp" id="app"><p class="tcount">Carregando…</p></main>
 
+<dialog id="confirma" aria-labelledby="cft" style="width:min(460px,calc(100vw - 24px))">
+  <div class="paywall" style="text-align:left">
+    <h2 id="cft"></h2>
+    <p id="cfd"></p>
+    <div class="actions">
+      <button class="btn prim" type="button" id="cfok"></button>
+      <button class="btn sec" type="button" id="cfno">Voltar</button>
+    </div>
+  </div>
+</dialog>
+
 <template id="tpl">
   <h1>Administração</h1>
-  <p class="lead">Cadastre vídeos e questões, e ajuste os planos. Tudo é salvo direto no banco de dados.</p>
+  <p class="lead">Adicione, edite e exclua vídeos e questões, ajuste os planos e acompanhe os relatórios. Tudo é salvo direto no banco de dados.</p>
+
+  <section class="secao-adm" id="sec-lista">
+    <div class="adm-top"><h2>Vídeos</h2>
+      <div class="acoes"><label class="sr" for="buscaadm">Buscar vídeo</label><input class="busca-adm" id="buscaadm" type="search" placeholder="Buscar por título, curso ou tema">
+      <button class="btn prim" type="button" id="novo">+ Novo vídeo</button></div></div>
+    <div class="tabwrap"><table class="tabela" id="tvideos"></table></div>
+  </section>
 
   <section class="secao-adm" id="sec-rel">
     <div class="adm-top"><h2>Relatórios</h2><span class="hint" id="relhora"></span></div>
@@ -83,11 +105,6 @@
         <button class="btn sec" type="submit">Buscar</button></form>
       <div class="aluno" id="aluno"></div>
     </div>
-  </section>
-
-  <section class="secao-adm" id="sec-lista">
-    <div class="adm-top"><h2>Vídeos</h2><button class="btn prim" type="button" id="novo">+ Novo vídeo</button></div>
-    <div class="tabwrap"><table class="tabela" id="tvideos"></table></div>
   </section>
 
   <section class="secao-adm" id="sec-form" hidden>
@@ -132,6 +149,7 @@
       <div class="acoes" style="align-self:end">
         <button class="btn prim" type="button" id="salvar">Salvar vídeo</button>
         <button class="btn sec" type="button" id="cancelarf">Cancelar</button>
+        <button class="btn danger" type="button" id="excluirf" hidden>Excluir este vídeo</button>
       </div>
     </div>
   </section>
@@ -168,29 +186,73 @@
   var f = $("#f"), qlist = $("#qlist"), LETRAS = "ABCDE", VIDEOS = [], editando = null, nq = 0;
 
   // ---------- Lista de vídeos ----------
+  var NQS = {}, LINKS = {};
   async function carregarLista() {
     var r = await Promise.all([Api.admin.videos(), Api.admin.contarQuestoes(), Api.conteudos()]);
-    VIDEOS = r[0];
-    var nqs = r[1], links = r[2];
-    $("#tvideos").innerHTML = '<tr><th>Título</th><th>Curso</th><th>Ano</th><th>Questões</th><th>Situação</th><th></th></tr>' +
-      (VIDEOS.length ? VIDEOS.map(function (v) {
-        return '<tr><td><strong>' + esc(v.titulo) + '</strong></td><td>' + esc(v.curso) + '</td><td>' + esc(v.ano || "") + '</td><td>' + (nqs[v.id] || 0) + '</td><td>' +
-          '<span class="tag2' + (v.publicado ? " on" : "") + '">' + (v.publicado ? "Publicado" : "Rascunho") + '</span> ' +
-          (links[v.id] ? '' : '<span class="tag2">Sem link</span> ') + (v.gratuito ? '<span class="tag2 on">Grátis</span> ' : '') + (v.destaque ? '<span class="tag2 on">Destaque</span>' : '') +
-          '</td><td style="white-space:nowrap"><button class="mini" type="button" data-ed="' + v.id + '">Editar</button> <button class="mini del" type="button" data-del="' + v.id + '">Excluir</button></td></tr>';
-      }).join("") : '<tr><td colspan="6" class="hint">Nenhum vídeo cadastrado ainda.</td></tr>');
+    VIDEOS = r[0]; NQS = r[1]; LINKS = r[2];
+    desenharLista();
     ["curso", "tema", "professor"].forEach(function (k) {
       var vals = {}; VIDEOS.forEach(function (v) { if (v[k]) vals[v[k]] = 1; });
       $("#l-" + k).innerHTML = Object.keys(vals).sort().map(function (x) { return '<option value="' + esc(x) + '">'; }).join("");
     });
   }
+  function semAcento(s) { return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
+  function desenharLista() {
+    var termo = semAcento($("#buscaadm").value.trim());
+    var lista = VIDEOS.filter(function (v) { return !termo || semAcento([v.titulo, v.curso, v.tema, v.professor, v.ano].join(" ")).indexOf(termo) >= 0; });
+    $("#tvideos").innerHTML = '<tr><th>Título</th><th>Curso</th><th>Ano</th><th>Questões</th><th>Situação</th><th>Ações</th></tr>' +
+      (lista.length ? lista.map(function (v) {
+        return '<tr><td><strong>' + esc(v.titulo) + '</strong></td><td>' + esc(v.curso) + '</td><td>' + esc(v.ano || "") + '</td><td>' + (NQS[v.id] || 0) + '</td><td>' +
+          '<span class="tag2' + (v.publicado ? " on" : "") + '">' + (v.publicado ? "Publicado" : "Oculto") + '</span> ' +
+          (LINKS[v.id] ? '' : '<span class="tag2">Sem vídeo</span> ') + (v.gratuito ? '<span class="tag2 on">Grátis</span> ' : '') + (v.destaque ? '<span class="tag2 on">Destaque</span>' : '') +
+          '</td><td><div class="acoes-linha"><button class="mini" type="button" data-ed="' + v.id + '">Editar</button>' +
+          '<button class="mini" type="button" data-pub="' + v.id + '">' + (v.publicado ? "Ocultar" : "Publicar") + '</button>' +
+          '<button class="mini del" type="button" data-del="' + v.id + '">Excluir</button></div></td></tr>';
+      }).join("") : '<tr><td colspan="6" class="hint">' + (VIDEOS.length ? "Nenhum vídeo encontrado para essa busca." : "Nenhum vídeo cadastrado ainda. Clique em + Novo vídeo.") + '</td></tr>');
+  }
+  $("#buscaadm").addEventListener("input", desenharLista);
+
+  // Confirmação dentro da página (funciona em qualquer navegador)
+  var dlg = $("#confirma");
+  function confirmar(titulo, texto, botao, acao) {
+    $("#cft").textContent = titulo; $("#cfd").textContent = texto;
+    var ok = $("#cfok"); ok.textContent = botao; ok.disabled = false;
+    ok.onclick = async function () {
+      ok.disabled = true;
+      try { await acao(); dlg.close(); } catch (err) { aviso(erroAmigavel(err), "erro"); ok.disabled = false; }
+    };
+    dlg.showModal();
+  }
+  $("#cfno").addEventListener("click", function () { dlg.close(); });
+
+  function pedirExclusao(v, depois) {
+    var nq = NQS[v.id] || 0;
+    confirmar('Excluir "' + v.titulo + '"?',
+      "O vídeo sai da plataforma" + (nq ? ", junto com " + nq + (nq === 1 ? " questão de treino" : " questões de treino") : "") +
+      ", e o progresso dos alunos neste vídeo é apagado. O arquivo no Bunny Stream não é apagado. Esta ação não pode ser desfeita.",
+      "Excluir vídeo", async function () {
+        await Api.admin.excluir(v.id);
+        aviso("Vídeo excluído.");
+        if (depois) depois();
+        await carregarLista();
+      });
+  }
+
   $("#tvideos").addEventListener("click", async function (ev) {
-    var ed = ev.target.closest("[data-ed]"), del = ev.target.closest("[data-del]");
-    if (ed) abrirForm(await Api.admin.obter(+ed.dataset.ed));
-    if (del) {
-      var v = VIDEOS.find(function (x) { return x.id === +del.dataset.del; });
-      if (!confirm('Excluir "' + v.titulo + '"? As questões e o progresso dos alunos neste vídeo também serão apagados.')) return;
-      try { await Api.admin.excluir(v.id); aviso("Vídeo excluído."); carregarLista(); } catch (err) { aviso(erroAmigavel(err), "erro"); }
+    var ed = ev.target.closest("[data-ed]"), del = ev.target.closest("[data-del]"), pub = ev.target.closest("[data-pub]");
+    if (ed) {
+      ed.disabled = true;
+      try { abrirForm(await Api.admin.obter(+ed.dataset.ed)); } catch (err) { aviso(erroAmigavel(err), "erro"); } finally { ed.disabled = false; }
+    }
+    if (del) pedirExclusao(VIDEOS.find(function (x) { return x.id === +del.dataset.del; }));
+    if (pub) {
+      var v = VIDEOS.find(function (x) { return x.id === +pub.dataset.pub; });
+      pub.disabled = true;
+      try {
+        await Api.admin.publicar(v.id, !v.publicado);
+        aviso(v.publicado ? "Vídeo ocultado: os alunos não veem mais." : "Vídeo publicado na vitrine.");
+        await carregarLista();
+      } catch (err) { aviso(erroAmigavel(err), "erro"); pub.disabled = false; }
     }
   });
 
@@ -205,20 +267,33 @@
       ["publicado", "destaque", "gratuito"].forEach(function (k) { f.elements[k].checked = !!v[k]; });
       (v.questoes || []).forEach(function (q) { novaQuestao(q.tipo, q); });
     }
+    $("#excluirf").hidden = !v;
     $("#sec-form").hidden = false; $("#sec-lista").hidden = true; $("#sec-planos").hidden = true; $("#sec-rel").hidden = true;
     window.scrollTo(0, 0);
+    renumerar();
     atualizarPrevia();
+    alterado = false;
   }
-  function fecharForm() { $("#sec-form").hidden = true; $("#sec-lista").hidden = false; $("#sec-planos").hidden = false; $("#sec-rel").hidden = false; }
+  var alterado = false;
+  function fecharForm() { alterado = false; $("#sec-form").hidden = true; $("#sec-lista").hidden = false; $("#sec-planos").hidden = false; $("#sec-rel").hidden = false; }
   $("#novo").addEventListener("click", function () { abrirForm(null); });
-  $("#cancelarf").addEventListener("click", fecharForm);
+  $("#cancelarf").addEventListener("click", function () {
+    if (!alterado) { fecharForm(); return; }
+    confirmar("Descartar as alterações?", "O que você mudou neste vídeo ainda não foi salvo.", "Descartar", async function () { fecharForm(); });
+  });
+  $("#excluirf").addEventListener("click", function () {
+    var v = VIDEOS.find(function (x) { return x.id === editando; });
+    if (v) pedirExclusao(v, fecharForm);
+  });
 
   function novaQuestao(tipo, dados) {
     var n = ++nq, el = document.createElement("div");
     dados = dados || {};
     el.className = "qb"; el.dataset.tipo = tipo;
-    var html = '<div class="qbtop"><strong>' + (tipo === "discursiva" ? "Questão discursiva" : "Questão objetiva") + '</strong>' +
-      '<button class="linkbtn" type="button" data-rm>Remover</button></div>' +
+    var html = '<div class="qbtop"><strong data-titulo-q></strong>' +
+      '<div class="ord"><button class="mini" type="button" data-up aria-label="Mover questão para cima">↑ Subir</button>' +
+      '<button class="mini" type="button" data-down aria-label="Mover questão para baixo">↓ Descer</button>' +
+      '<button class="mini del" type="button" data-rm>Remover</button></div></div>' +
       '<label>Enunciado<textarea data-k="enunciado" placeholder="Texto da questão. Pode ter várias linhas."></textarea></label>';
     if (tipo === "discursiva") {
       html += '<label>Padrão de resposta (aparece no gabarito)<textarea data-k="resposta"></textarea></label>';
@@ -239,7 +314,17 @@
       var c = el.querySelector('input[type=radio][value="' + (dados.correta || "A") + '"]') || el.querySelector("input[type=radio]");
       c.checked = true;
     }
+    renumerar();
     if (!dados.enunciado) el.querySelector("textarea").focus();
+  }
+  // "Questão 1 · objetiva", e desativa Subir/Descer nas pontas
+  function renumerar() {
+    var qs = qlist.children;
+    Array.prototype.forEach.call(qs, function (el, i) {
+      el.querySelector("[data-titulo-q]").textContent = "Questão " + (i + 1) + " · " + (el.dataset.tipo === "discursiva" ? "discursiva" : "objetiva");
+      el.querySelector("[data-up]").disabled = i === 0;
+      el.querySelector("[data-down]").disabled = i === qs.length - 1;
+    });
   }
   function lerQuestoes() {
     return Array.prototype.map.call(qlist.children, function (el) {
@@ -256,8 +341,16 @@
       return q;
     }).filter(function (q) { return q.enunciado; });
   }
-  document.querySelectorAll("[data-add]").forEach(function (b) { b.addEventListener("click", function () { novaQuestao(b.dataset.add); }); });
-  qlist.addEventListener("click", function (ev) { if (ev.target.matches("[data-rm]")) ev.target.closest(".qb").remove(); });
+  document.querySelectorAll("[data-add]").forEach(function (b) { b.addEventListener("click", function () { novaQuestao(b.dataset.add); alterado = true; }); });
+  qlist.addEventListener("click", function (ev) {
+    var qb = ev.target.closest(".qb");
+    if (!qb) return;
+    if (ev.target.matches("[data-rm]")) { qb.remove(); alterado = true; }
+    else if (ev.target.matches("[data-up]") && qb.previousElementSibling) { qlist.insertBefore(qb, qb.previousElementSibling); alterado = true; }
+    else if (ev.target.matches("[data-down]") && qb.nextElementSibling) { qlist.insertBefore(qb.nextElementSibling, qb); alterado = true; }
+    else return;
+    renumerar();
+  });
 
   function dados() {
     var d = { id: editando, bunny_id: bunnyId(f.elements.video.value) };
@@ -272,8 +365,9 @@
     $("#prev").innerHTML = cardHTML(Object.assign({}, d, { bunny: d.bunny_id, tem_video: !!d.bunny_id, n_questoes: d.questoes.length,
       titulo: d.titulo || "Título do vídeo", curso: d.curso || "Curso", ano: d.ano || "2024" }), 0, 0);
   }
-  f.addEventListener("input", atualizarPrevia);
-  qlist.addEventListener("input", atualizarPrevia);
+  f.addEventListener("input", function () { alterado = true; atualizarPrevia(); });
+  f.addEventListener("change", function () { alterado = true; });
+  qlist.addEventListener("input", function () { alterado = true; atualizarPrevia(); });
   qlist.addEventListener("click", function () { setTimeout(atualizarPrevia, 0); });
 
   $("#salvar").addEventListener("click", async function () {
@@ -306,10 +400,25 @@
       '<td><textarea data-p="beneficios">' + esc((p.beneficios || []).join("\n")) + '</textarea></td>' +
       '<td><input type="checkbox" data-p="destaque"' + (p.destaque ? " checked" : "") + '></td>' +
       '<td><input type="checkbox" data-p="ativo"' + (p.ativo !== false ? " checked" : "") + '></td>' +
-      '<td><button class="mini" type="button" data-salvarplano>Salvar</button></td></tr>';
+      '<td><div class="acoes-linha"><button class="mini" type="button" data-salvarplano>Salvar</button>' +
+        (p.id ? '<button class="mini del" type="button" data-delplano>Excluir</button>' : '<button class="mini" type="button" data-descartar>Descartar</button>') + '</div></td></tr>';
   }
   $("#novoplano").addEventListener("click", function () { $("#tplanos").insertAdjacentHTML("beforeend", linhaPlano({ meses: 1, ativo: true })); });
   $("#tplanos").addEventListener("click", async function (ev) {
+    if (ev.target.matches("[data-descartar]")) { ev.target.closest("tr").remove(); return; }
+    if (ev.target.matches("[data-delplano]")) {
+      var id = ev.target.closest("tr").dataset.id;
+      confirmar('Excluir o plano "' + id + '"?', "Ele some da página de planos. Planos que já tiveram assinaturas não podem ser excluídos, porque os registros de pagamento dependem deles; nesse caso, desmarque Ativo para escondê-lo.",
+        "Excluir plano", async function () {
+          try { await Api.admin.excluirPlano(id); }
+          catch (err) {
+            if (/foreign key|23503/i.test(String(err.message || err.code || ""))) throw new Error('Este plano já tem assinaturas e não pode ser excluído. Desmarque "Ativo" e clique em Salvar para escondê-lo da página de planos.');
+            throw err;
+          }
+          aviso("Plano excluído."); carregarPlanos();
+        });
+      return;
+    }
     if (!ev.target.matches("[data-salvarplano]")) return;
     var tr = ev.target.closest("tr"), g = function (k) { return tr.querySelector('[data-p="' + k + '"]'); };
     var p = {
